@@ -18,6 +18,8 @@ src-tauri/gen/android/local.properties
 src-tauri/gen/android/app/build
 src-tauri/gen/android/build
 *.keystore
+*.jks
+*.p12
 keystore.properties
 
 # Claude Code: settings.json waere geteilt, settings.local.json ist

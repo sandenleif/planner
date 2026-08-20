@@ -25,6 +25,23 @@ allen Nutzern.
 **Kopiere `.tauri/planner.key` in einen Passwortmanager, bevor du den Rechner
 wechselst.** Die Datei ist gitignored und wandert nicht mit.
 
+### Dasselbe gilt jetzt ein zweites Mal: der Android-Upload-Schlüssel
+
+`.tauri/planner-upload.p12` signiert die Android-App. Android akzeptiert eine
+Aktualisierung **nur**, wenn sie mit demselben Schlüssel signiert ist wie die
+installierte Version — bei einem weitergegebenen APK gibt es dagegen kein
+Mittel. Wer den Schlüssel verliert, kann installierten Apps nie wieder ein
+Update schicken; alle müssten von Hand deinstallieren und neu installieren.
+
+(Beim Play Store wäre es weniger endgültig: dort lässt sich mit Play App
+Signing ein verlorener Upload-Schlüssel zurücksetzen. Für APKs, die an der
+Store-Infrastruktur vorbei weitergegeben werden, gilt das nicht.)
+
+Der Schlüssel liegt an **zwei Orten**: in `.tauri/` auf diesem Rechner und —
+sobald du sie anlegst — als GitHub-Secrets. Passwort und Alias stehen in
+`.tauri/planner-upload.txt`. Alles davon gehört in denselben Passwortmanager
+wie `planner.key`.
+
 ---
 
 ## Was läuft
@@ -245,6 +262,50 @@ Aufgabe berechnete ihre Position (Fractional Index) gegen eine leere
 Geschwisterliste, weil `tasks(listId)` dort nie geladen ist. Alle bekamen
 damit denselben Schlüssel. `knownSiblings()` greift jetzt auf `allTasks`
 zurück.
+
+### Was für ein produktionsreifes APK noch fehlt
+
+Die Kette steht: Der Workflow baut signierte APK/AAB, sobald die Secrets da
+sind, und fällt ohne sie auf ein Debug-APK zurück — ein Lauf bricht also nie
+ab, nur weil ein Schlüssel fehlt. `scripts/android-release.mjs` richtet nach
+jedem `android:init` beides ein: die Signatur und den Intent-Filter für
+`planner://`. Beides muss dort stehen und nicht in einer eingecheckten Datei,
+weil `gen/android` erzeugter Code ist und bei jedem Lauf neu entsteht.
+
+**Vier Secrets anlegen** unter
+<https://github.com/sandenleif/planner/settings/secrets/actions>. Die Werte
+stehen in `.tauri/planner-upload.txt`, der base64-Block in
+`.tauri/planner-upload.p12.base64`:
+
+| Secret | Wert |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | kompletter Inhalt von `planner-upload.p12.base64` (eine Zeile, keine Umbrüche) |
+| `ANDROID_KEYSTORE_PASSWORD` | aus `planner-upload.txt` |
+| `ANDROID_KEY_PASSWORD` | derselbe Wert |
+| `ANDROID_KEY_ALIAS` | `planner-upload` |
+
+Halb angelegt ist schlimmer als gar nicht: Das Skript bricht dann absichtlich
+ab, statt still mit dem Debug-Schlüssel weiterzusignieren — sonst entstünde
+ein APK, das aussieht wie ein Release und sich nie wieder aktualisieren lässt.
+
+**`planner://auth-callback` in Supabase eintragen** unter
+<https://supabase.com/dashboard/project/uzbwckjuowcexwsybtel/auth/url-configuration>.
+Ohne den Eintrag schlägt die Google-Anmeldung auf Android fehl, und zwar
+stumm — Supabase fällt still auf die Site URL zurück (siehe Punkt 2 unten).
+Der Intent-Filter allein reicht nicht.
+
+**Ungeprüft bleibt danach**: ob der Schlüssel für Java lesbar ist. Er ist mit
+openssl erzeugt (auf dem Rechner gab es kein JDK, also kein `keytool`) und ist
+ein PKCS12 mit AES-256 — was Java 17 lesen kann. Beweisen wird es erst der
+erste signierte Lauf; scheitert er an der Datei, sagt Gradle das deutlich, und
+ein neuer Schlüssel ist eine Minute Arbeit, **solange noch niemand die App
+installiert hat**.
+
+**Nicht angefasst**: R8/Minify bleibt aus. Das spart ein paar Megabyte, kann
+aber die Klassen entfernen, die Tauri und der AppWidgetManager über ihren
+Namen finden. Ohne ein Gerät zum Gegenprüfen ist das die falsche Baustelle —
+die Keep-Regeln dafür stehen bereits in
+`plugins/planner-widget/android/proguard-rules.pro`.
 
 ### Die Capabilities sind dafür aufgeteilt worden
 

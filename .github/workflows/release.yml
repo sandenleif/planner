@@ -143,9 +143,9 @@ jobs:
       - name: Rust einrichten
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Nur arm64: jedes Android-Gerät der letzten Jahre ist arm64, und
-          # jedes weitere Ziel kostet einen kompletten Durchlauf.
-          targets: aarch64-linux-android
+          # arm64 deckt jedes Gerät der letzten Jahre ab, armv7 die älteren.
+          # x86_64 wäre nur für Emulatoren und kostet einen ganzen Durchlauf.
+          targets: aarch64-linux-android,armv7-linux-androideabi
 
       - name: Rust-Cache
         uses: swatinem/rust-cache@v2
@@ -162,26 +162,45 @@ jobs:
       - name: Gradle-Projekt erzeugen
         run: npm run android:init
 
-      # --debug, weil ein Release-APK einen Keystore bräuchte, den es noch
-      # nicht gibt. Ein Debug-APK signiert Gradle selbst und lässt sich ganz
-      # normal auf ein Gerät ziehen - zum Ausprobieren genau das Richtige.
+      # Signatur und der Intent-Filter für planner:// müssen nach jedem init
+      # neu hinein - gen/android ist erzeugter Code. Ohne Keystore-Secrets tut
+      # das Skript nichts und meldet es; dann bleibt es beim Debug-Build.
+      - name: Release-Signatur und Deep-Link einrichten
+        id: signing
+        run: npm run android:release-setup
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      # Signiert: APK zum Weitergeben und AAB für den Play Store.
+      # Unsigniert: ein Debug-APK, damit ein Lauf ohne Secrets trotzdem etwas
+      # Brauchbares abwirft statt abzubrechen.
       - name: APK bauen
-        run: npm run android:build -- --debug --apk --target aarch64
+        run: |
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            npm run android:build -- --apk --aab --target aarch64 armv7
+          else
+            npm run android:build -- --debug --apk --target aarch64
+          fi
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
 
       - name: Zeigen, was entstanden ist
-        run: find src-tauri/gen/android -name '*.apk' -exec ls -lh {} +
+        run: find src-tauri/gen/android -name '*.apk' -o -name '*.aab' | xargs ls -lh
 
       # Auch ohne Tag abholbar - so lässt sich ein Android-Build über
       # workflow_dispatch ausprobieren, ohne eine Version zu verbrennen.
       - name: APK als Artefakt ablegen
         uses: actions/upload-artifact@v4
         with:
-          name: planner-android-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          name: planner-android
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
           if-no-files-found: error
 
       # gh ist auf dem Runner vorinstalliert - das spart eine weitere Action
@@ -192,7 +211,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.ref_name }}" \
-            $(find src-tauri/gen/android -name '*.apk') --clobber
+            $(find src-tauri/gen/android \( -name '*.apk' -o -name '*.aab' \)) --clobber
 
   # Läuft nach allen Plattformen und beantwortet die eine Frage, die man
   # sonst erst nach der Installation stellt.

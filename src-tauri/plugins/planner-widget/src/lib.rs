@@ -85,7 +85,15 @@ impl std::error::Error for Error {}
 /// Ohne Serialize kaeme der Fehler nicht durch die IPC-Grenze zurueck ins
 /// Frontend - Tauri verlangt das von jedem Fehlertyp eines Befehls.
 impl Serialize for Error {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    /// `std::result::Result` steht hier voll qualifiziert, und das ist noetig:
+    /// Der Alias `Result<T>` weiter unten hat nur einen Typparameter und wuerde
+    /// `Result<S::Ok, S::Error>` verdecken. Der Compiler meldet das dann als
+    /// "type alias takes 1 generic argument but 2 were supplied" - eine
+    /// Fehlermeldung, die auf den Alias zeigt statt auf die Ursache.
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
     }
 }
