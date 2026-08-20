@@ -18,7 +18,7 @@
 //! das Homescreen-Widget (siehe `plugins/planner-widget`).
 
 #[cfg(desktop)]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 #[cfg(desktop)]
 use tauri::{
@@ -37,6 +37,21 @@ const OAUTH_EVENT: &str = "oauth://callback";
 /// Muss zu `PANEL_SHOWN_EVENT` in src/lib/desktop.ts passen.
 #[cfg(desktop)]
 const PANEL_SHOWN: &str = "panel://shown";
+
+/// Kuendigt dem Panel an, dass es gleich verschwindet — damit es sich
+/// ausblenden kann, statt schlagartig weg zu sein.
+/// Muss zu `PANEL_HIDING_EVENT` in src/lib/desktop.ts passen.
+#[cfg(desktop)]
+const PANEL_HIDING: &str = "panel://hiding";
+
+/// Wie lange zwischen Ankuendigung und tatsaechlichem Verstecken liegt.
+///
+/// Muss etwas ueber der Dauer der Ausblend-Animation im Frontend liegen (dort
+/// 120 ms). Zu kurz, und das Fenster ist weg, bevor die Bewegung sichtbar war;
+/// zu lang, und ein Klick daneben fuehlt sich zaeh an — bei einem Popover, das
+/// man dutzendfach am Tag auf- und zuklappt, faellt das sofort auf.
+#[cfg(desktop)]
+const HIDE_DELAY: std::time::Duration = std::time::Duration::from_millis(135);
 
 /// ID des Tray-Symbols. Wird gebraucht, um es später wiederzufinden und die
 /// Anzahl daran zu schreiben.
@@ -59,6 +74,15 @@ const PANEL: &str = "panel";
 #[derive(Default)]
 struct PanelState {
     pinned: AtomicBool,
+    /// Zaehlt jedes Zeigen und Verstecken mit.
+    ///
+    /// Das verzoegerte Verstecken merkt sich den Stand beim Start und prueft
+    /// ihn beim Aufwachen erneut. Klappt jemand das Panel innerhalb der 135 ms
+    /// wieder auf, ist die Zahl weitergelaufen — und das wartende Verstecken
+    /// gehoert zu einer Vorgeschichte und laesst das Fenster in Ruhe. Ohne
+    /// diesen Zaehler wuerde ein schneller Doppelklick aufs Tray-Symbol das
+    /// gerade geoeffnete Panel sofort wieder zuklappen.
+    generation: AtomicU64,
 }
 
 #[cfg(desktop)]
@@ -81,11 +105,48 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+/// Blendet das Panel aus: erst ankuendigen, dann kurz warten, dann verstecken.
+///
+/// Der Umweg ist noetig, weil das Verstecken eines Fensters nichts ist, was
+/// sich animieren liesse — es ist sofort weg. Also laeuft die Bewegung im
+/// Frontend, und Rust wartet sie ab.
 #[cfg(desktop)]
 fn hide_panel_window(app: &AppHandle) {
-    if let Some(panel) = app.get_webview_window(PANEL) {
-        let _ = panel.hide();
+    let Some(panel) = app.get_webview_window(PANEL) else {
+        return;
+    };
+
+    // Ist es ohnehin unsichtbar, gibt es nichts auszublenden - und vor allem
+    // keinen Grund, den Zaehler weiterzudrehen.
+    if !panel.is_visible().unwrap_or(false) {
+        return;
     }
+
+    let Some(state) = app.try_state::<PanelState>() else {
+        // Ohne Zustand kein Zaehler und damit kein sicheres Verzoegern.
+        let _ = panel.hide();
+        return;
+    };
+
+    let generation = state.generation.fetch_add(1, Ordering::Relaxed) + 1;
+    let _ = app.emit_to(PANEL, PANEL_HIDING, ());
+
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(HIDE_DELAY);
+
+        let still_current = handle
+            .try_state::<PanelState>()
+            .is_some_and(|state| state.generation.load(Ordering::Relaxed) == generation);
+
+        if !still_current {
+            return;
+        }
+
+        if let Some(panel) = handle.get_webview_window(PANEL) {
+            let _ = panel.hide();
+        }
+    });
 }
 
 /// Zeigt das Panel und meldet ihm, dass es sichtbar geworden ist.
@@ -105,6 +166,12 @@ fn show_panel_window(app: &AppHandle, move_to_tray: bool) {
         // Unter dem Symbol auf Windows, darunter hängend auf macOS - beides
         // deckt TrayBottomCenter ab.
         let _ = panel.move_window(Position::TrayBottomCenter);
+    }
+
+    // Vor dem Zeigen: ein wartendes Verstecken aus der letzten Sekunde darf
+    // das Fenster nicht gleich wieder zuklappen.
+    if let Some(state) = app.try_state::<PanelState>() {
+        state.generation.fetch_add(1, Ordering::Relaxed);
     }
 
     let _ = panel.show();
@@ -127,7 +194,10 @@ fn toggle_panel(app: &AppHandle) {
     };
 
     if panel.is_visible().unwrap_or(false) {
-        let _ = panel.hide();
+        // Ueber hide_panel_window: der Klick aufs Tray-Symbol ist der
+        // haeufigste Weg, das Panel zu schliessen - gerade dort soll es sich
+        // ausblenden statt zu verschwinden.
+        hide_panel_window(app);
         return;
     }
 
@@ -440,7 +510,9 @@ pub fn run() {
                 tauri::WindowEvent::Focused(false)
                     if window.label() == PANEL && !panel_is_pinned(window.app_handle()) =>
                 {
-                    let _ = window.hide();
+                    // Ueber hide_panel_window statt window.hide(): so laeuft
+                    // auch beim Klick daneben die Ausblend-Animation.
+                    hide_panel_window(window.app_handle());
                 }
                 // Das Hauptfenster zu schliessen beendet die App nicht - sie
                 // lebt in der Menueleiste weiter. Beendet wird ueber das

@@ -44,6 +44,9 @@ const POSITION_KEY = 'planner:panel-position'
 /** Muss zu `PANEL_SHOWN` in src-tauri/src/lib.rs passen. */
 export const PANEL_SHOWN_EVENT = 'panel://shown'
 
+/** Muss zu `PANEL_HIDING` in src-tauri/src/lib.rs passen. */
+export const PANEL_HIDING_EVENT = 'panel://hiding'
+
 interface StoredPosition {
   x: number
   y: number
@@ -178,7 +181,23 @@ async function restorePanelPosition(): Promise<void> {
  * Rückgabe ist die Abmeldefunktion.
  */
 export async function onPanelShown(handler: () => void): Promise<() => void> {
+  return listenToPanel(PANEL_SHOWN_EVENT, handler)
+}
+
+/**
+ * Meldet, dass das Panel gleich versteckt wird.
+ *
+ * Rust wartet danach kurz (135 ms), bevor es das Fenster tatsächlich schließt —
+ * genug für die Ausblend-Bewegung. Ein Fenster selbst lässt sich nicht
+ * animieren: es ist von einem Bild aufs nächste weg. Also läuft die Bewegung
+ * hier drinnen, und die native Seite hält so lange still.
+ */
+export async function onPanelHiding(handler: () => void): Promise<() => void> {
+  return listenToPanel(PANEL_HIDING_EVENT, handler)
+}
+
+async function listenToPanel(event: string, handler: () => void): Promise<() => void> {
   if (!isTauri) return () => {}
   const { listen } = await import('@tauri-apps/api/event')
-  return listen(PANEL_SHOWN_EVENT, () => handler())
+  return listen(event, () => handler())
 }

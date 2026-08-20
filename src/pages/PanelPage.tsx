@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -34,6 +34,7 @@ import { parseQuickAdd } from '@/lib/parseQuickAdd'
 import {
   hidePanel,
   isPanelPinned,
+  onPanelHiding,
   onPanelShown,
   openMainWindow,
   setPanelPinned,
@@ -74,7 +75,7 @@ export function PanelPage() {
   const [view, setView] = useState<PanelView>({ kind: 'today' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const { pinned, togglePinned } = usePanelWindow()
+  const { pinned, togglePinned, surfaceRef } = usePanelWindow()
 
   // Eigenes Fenster, eigene WebView, eigener Query-Cache - also auch ein
   // eigenes Abo. Ohne das sähe das Panel Fremdänderungen erst beim
@@ -145,11 +146,15 @@ export function PanelPage() {
   }
 
   if (auth.mode === 'supabase' && !auth.userId) {
-    return <PanelSignedOut loading={auth.loading} />
+    return (
+      <div ref={surfaceRef} className="panel-surface">
+        <PanelSignedOut loading={auth.loading} />
+      </div>
+    )
   }
 
   return (
-    <div className="flex h-full flex-col bg-app">
+    <div ref={surfaceRef} className="panel-surface flex flex-col">
       <header
         className="flex shrink-0 items-start justify-between gap-2 px-4 pb-2 pt-3.5"
         data-tauri-drag-region
@@ -170,7 +175,7 @@ export function PanelPage() {
           )}
 
           <div className="min-w-0">
-            <p className="truncate text-[11px] uppercase tracking-wider text-muted">
+            <p className="truncate text-[11px] text-muted">
               {activeList
                 ? `${listRows.length} offen`
                 : new Intl.DateTimeFormat('de-DE', {
@@ -291,9 +296,11 @@ export function PanelPage() {
               </ul>
             )}
 
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted">
-              Listen
-            </p>
+            {/* Statt einer Ueberschrift „LISTEN" nur eine Haarlinie: dass
+                farbige Kacheln mit Zahlen Listen sind, muss niemandem gesagt
+                werden, und Versalien in Kleinstschrift sind die Sorte
+                Beschriftung, die jede Oberflaeche gleich aussehen laesst. */}
+            <div className="mb-2.5 mt-1 h-px bg-subtle" />
 
             <div className="grid grid-cols-2 gap-2">
               {sortedLists.map((list) => (
@@ -529,6 +536,75 @@ function PanelTaskRow({
 function usePanelWindow() {
   const queryClient = useQueryClient()
   const [pinned, setPinned] = useState(isPanelPinned)
+  const surfaceRef = useRef<HTMLDivElement>(null)
+
+  // Das Panel-Fenster ist randlos und transparent. Damit die runden Ecken
+  // sichtbar werden, darf der Body keine Farbe malen — die Klasse schaltet das
+  // in index.css um. Sie steht auf <html>, weil das Panel dieselbe index.html
+  // lädt wie das Hauptfenster und die Regel nur hier gelten darf.
+  useEffect(() => {
+    document.documentElement.classList.add('is-panel')
+    return () => document.documentElement.classList.remove('is-panel')
+  }, [])
+
+  /**
+   * Ein- und Ausblenden.
+   *
+   * Über die Web Animations API statt über CSS-Klassen: Das Fenster wird nie
+   * neu montiert, sondern nur gezeigt und versteckt. Eine CSS-Animation liefe
+   * deshalb genau einmal und beim zweiten Aufklappen nie wieder — man müsste
+   * sie über einen Umweg neu anstoßen. `element.animate()` startet dagegen bei
+   * jedem Aufruf von vorn.
+   */
+  const play = useCallback((kind: 'in' | 'out') => {
+    const element = surfaceRef.current
+    if (!element) return
+
+    // Wer „Bewegung reduzieren" eingestellt hat, bekommt das Panel ohne
+    // Bewegung. Rust wartet trotzdem seine 135 ms ab - das ist unauffällig.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    // Eine noch laufende Bewegung aus dem letzten Auf- oder Zuklappen würde
+    // sonst mit fill: 'both' den Endzustand festhalten.
+    for (const animation of element.getAnimations()) animation.cancel()
+
+    if (kind === 'in') {
+      element.animate(
+        [
+          { opacity: 0, transform: 'translateY(-8px) scale(0.96)' },
+          { opacity: 1, transform: 'translateY(0) scale(1)' },
+        ],
+        // Ease-out, das schnell anfängt und weich ausläuft - die Kurve, nach
+        // der sich ein Popover anfühlt, statt einfach da zu sein.
+        { duration: 180, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'both' },
+      )
+      return
+    }
+
+    element.animate(
+      [
+        { opacity: 1, transform: 'translateY(0) scale(1)' },
+        { opacity: 0, transform: 'translateY(-4px) scale(0.985)' },
+      ],
+      // Kürzer als das Einblenden: Zumachen soll sich entschieden anfühlen,
+      // nicht zögerlich. Muss unter HIDE_DELAY in src-tauri/src/lib.rs bleiben.
+      { duration: 120, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'both' },
+    )
+  }, [])
+
+  useEffect(() => {
+    let dispose: (() => void) | undefined
+    let cancelled = false
+
+    void onPanelHiding(() => play('out')).then((fn) =>
+      cancelled ? fn() : (dispose = fn),
+    )
+
+    return () => {
+      cancelled = true
+      dispose?.()
+    }
+  }, [play])
 
   // Beim Start meldet das Panel den gemerkten Zustand einmal nach Rust. Rust
   // startet immer ungeheftet - dort überlebt nichts einen Neustart.
@@ -555,6 +631,7 @@ function usePanelWindow() {
     let cancelled = false
 
     void onPanelShown(() => {
+      play('in')
       void queryClient.invalidateQueries({ queryKey: qk.lists })
       void queryClient.invalidateQueries({ queryKey: qk.allTasks })
     }).then((fn) => (cancelled ? fn() : (dispose = fn)))
@@ -563,7 +640,7 @@ function usePanelWindow() {
       cancelled = true
       dispose?.()
     }
-  }, [queryClient])
+  }, [queryClient, play])
 
   const togglePinned = () => {
     const next = !pinned
@@ -571,7 +648,7 @@ function usePanelWindow() {
     void setPanelPinned(next)
   }
 
-  return { pinned, togglePinned }
+  return { pinned, togglePinned, surfaceRef }
 }
 
 /**
@@ -583,7 +660,7 @@ function usePanelWindow() {
  */
 function PanelSignedOut({ loading }: { loading: boolean }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 bg-app px-8 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
       {loading ? (
         <p className="text-sm text-muted">Einen Moment …</p>
       ) : (
