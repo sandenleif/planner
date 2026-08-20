@@ -229,9 +229,57 @@ npm run android:build   # APK/AAB
 
 ## Web ausliefern
 
-`npm run build` erzeugt `dist/` — ein statischer Ordner für Netlify, Vercel,
-Cloudflare Pages oder jeden Webserver. Die App nutzt Hash-Routing, deshalb
+`npm run build` erzeugt `dist/` — ein statischer Ordner für Cloudflare Pages,
+Netlify, Vercel oder jeden Webserver. Die App nutzt Hash-Routing, deshalb
 braucht es keine Server-Rewrites.
+
+### Cloudflare Pages
+
+| Einstellung | Wert |
+|---|---|
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Node-Version | aus `.node-version` (22) |
+
+**Die Umgebungsvariablen nicht vergessen.** In den Pages-Projekteinstellungen
+unter Settings → Environment variables müssen stehen:
+
+```
+VITE_SUPABASE_URL        https://<projekt>.supabase.co
+VITE_SUPABASE_ANON_KEY   <anon-Key>
+VITE_PUBLIC_APP_URL      https://<deine-domain>
+```
+
+Fehlen sie, schlägt der Build **nicht** fehl — er erzeugt eine App im lokalen
+Modus: kein Login, Daten nur im Browser des Besuchers. Das sieht auf den ersten
+Blick aus wie eine funktionierende Seite, ist aber die falsche. (Erkennbar am
+„lokal"-Abzeichen oben links in der Seitenleiste.)
+
+Vite ersetzt `VITE_*` zur **Buildzeit**. Neue Werte greifen also erst nach
+einem erneuten Deploy, nicht sofort nach dem Speichern.
+
+**Nach dem ersten Deploy**: die Pages-Adresse in Supabase unter
+Authentication → URL Configuration → Redirect URLs eintragen, sonst schlägt
+die Google-Anmeldung auf der ausgelieferten Seite fehl:
+
+```
+https://<projekt>.pages.dev
+```
+
+### Security-Header
+
+`public/_headers` wird von Cloudflare Pages und Netlify gelesen und liefert
+CSP, `X-Content-Type-Options`, `Referrer-Policy` und `Permissions-Policy` aus.
+Ohne diese Datei ginge die Seite ganz ohne CSP live — die Tauri-Variante bringt
+ihre eigene über `tauri.conf.json` mit, im Web gibt es dafür keinen Ort im
+Bundle.
+
+Getestet wurde die CSP gegen den echten Build: alle Ansichten, Dialoge, Suche
+und die farbigen Kacheln (deren Farben als Inline-Styles kommen, der heikelste
+Punkt) laufen ohne Verstoß.
+
+Bei selbst gehostetem Supabase muss der eigene Host in `connect-src` ergänzt
+werden — sonst schlagen alle Anfragen fehl, und zwar stumm in der Konsole.
 
 Der Bundle liegt bei rund 610 KB roh, 177 KB gzip. Gut die Hälfte davon ist
 `@supabase/supabase-js`. Baut man ohne `.env.local`, sind es nur 408 KB — Vite

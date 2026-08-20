@@ -1,0 +1,36 @@
+# Security-Header für Cloudflare Pages (und Netlify - beide lesen diese Datei).
+#
+# Die Desktop-App bringt ihre CSP über src-tauri/tauri.conf.json mit. Im Web
+# gibt es dafür keinen Ort im Bundle - Header muss der Server liefern. Ohne
+# diese Datei läuft die ausgelieferte Seite ganz ohne CSP.
+#
+# ACHTUNG bei eigenem Supabase-Host: connect-src unten erlaubt nur *.supabase.co.
+# Wer selbst hostet, muss den eigenen Host ergänzen, sonst schlagen alle
+# Anfragen fehl - und zwar stumm in der Konsole, nicht sichtbar in der App.
+
+/*
+  # Kein Framing: schützt gegen Clickjacking. frame-ancestors ist die
+  # moderne Form von X-Frame-Options und wird von der CSP mit abgedeckt.
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'
+
+  # Verhindert, dass der Browser Dateitypen errät - etwa eine hochgeladene
+  # Textdatei als Skript ausführt.
+  X-Content-Type-Options: nosniff
+
+  # Beim Wechsel auf fremde Seiten nur die Herkunft mitschicken, nicht den
+  # vollen Pfad. Eine Listen-URL soll nicht in fremden Logs landen.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Die App braucht nichts davon. Was man nicht braucht, schaltet man ab.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+  X-Frame-Options: DENY
+
+# Gehashte Dateinamen ändern sich bei jedem Build - die dürfen ewig im Cache
+# bleiben. index.html dagegen nie, sonst sieht man nach einem Deploy weiter
+# die alte Version.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/index.html
+  Cache-Control: no-cache
