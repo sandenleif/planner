@@ -36,7 +36,8 @@ wechselst.** Die Datei ist gitignored und wandert nicht mit.
 | Eigene Domain | `planner.leifsanden.com` zeigt auf Cloudflare, **nicht verifiziert** (s.u.) |
 | Desktop | v1.0.1 als GitHub-Release, macOS + Windows + Linux |
 | Auth | E-Mail/Passwort funktioniert, Google **ungeprüft** (s.u.) |
-| Android | noch nichts gemacht |
+| Android | Widget fertig geschrieben, **nie gebaut** (s.u.) |
+| Widgets | Code steht für beide Plattformen, **nichts davon kompiliert** (s.u.) |
 
 ### Prüfen, ob die Web-Version im richtigen Modus läuft
 
@@ -78,6 +79,116 @@ selbst.
 
 Ohne `.env.local` startet die App im lokalen Modus. Das ist kein Fehler,
 sondern der gewollte Startzustand — nur eben ohne Login und ohne Sync.
+
+---
+
+## Die Widgets
+
+Beide Plattformen haben jetzt eine Ansicht, für die man die App nicht öffnen
+muss. Der Code steht vollständig, **kompiliert wurde davon nichts**: auf dem
+Rechner, an dem das entstanden ist, gab es weder `cargo` noch ein JDK noch das
+Android-SDK. Geprüft sind nur die TypeScript-Teile (`typecheck`, `lint`,
+`build` laufen durch).
+
+### Ein Weg, zwei Ziele
+
+`src/lib/widget.ts` rechnet einmal aus, was heute ansteht, und schickt das
+Ergebnis dorthin, wo es die Plattform anzeigt: auf dem Desktop als Zahl ans
+Tray-Symbol, auf Android an das Homescreen-Widget. Angestoßen wird das von
+`useWidgetSync()` in der Shell des **Hauptfensters** — bewusst nicht im Panel:
+das läuft in einer eigenen WebView mit eigenem Query-Cache, und zwei Absender
+für dieselbe Zahl werden früher oder später uneinig.
+
+Die Zeilen gehen **fertig formatiert** hinaus („Heute 14:30"). Sonst müsste
+der Kotlin-Teil deutsche Datumsnamen und die Regel „überfällig ist alles vor
+jetzt" ein zweites Mal kennen — an einer Stelle, an der niemand nachsieht,
+wenn sich die Regel ändert.
+
+### Desktop: das Panel bleibt stehen
+
+Aus dem Menüleisten-Panel ist ein anheftbares Widget geworden. Die Stecknadel
+oben rechts schaltet um; angeheftet verschwindet es nicht mehr beim Klick
+daneben, merkt sich seine Position und ist nach einem Neustart wieder da.
+
+Neu in `src-tauri/src/lib.rs`: `set_tray_badge`, `set_panel_pinned`, das
+Ereignis `panel://shown` (ohne das zeigte das Panel beim Aufklappen den Stand
+von vorhin — das Fenster wird nie neu montiert) und ein Menüeintrag „Panel
+anzeigen" fürs Tray-Menü, weil Linux kein verlässliches Linksklick-Ereignis
+für Tray-Symbole hat.
+
+**Zu tun:** `npm run desktop:dev`, dann der Reihe nach: Zahl am Symbol stimmt,
+Anheften hält, Position überlebt den Neustart, Aufklappen zeigt frische Daten.
+
+Ebenfalls neu und ebenfalls ungetestet: **Einstellungen → Programm** zeigt die
+laufende Version und sucht auf Knopfdruck nach Updates. Das Suchen selbst ist
+nur ein Abruf von `latest.json` und funktioniert auch im Entwicklungsmodus —
+solange die Version in `tauri.conf.json` die des neusten veröffentlichten
+Releases ist, lautet die Antwort „bereits die neuste Version". Den
+**Installieren**-Knopf dort nicht ausprobieren: `tauri dev` startet die nackte
+Binärdatei, es gibt kein `.app`-Bundle zum Ersetzen. Sinnvoll prüfen lässt sich
+das erst mit einer installierten Version gegen ein veröffentlichtes neueres
+Release.
+
+### Android: das Homescreen-Widget
+
+Liegt als eigenes Tauri-Plugin unter `src-tauri/plugins/planner-widget/` —
+Rust-Brücke plus Gradle-Bibliothek mit Kotlin. Als Plugin und nicht als
+Änderung am erzeugten Gradle-Projekt, weil `tauri android init` dieses Projekt
+jederzeit neu schreiben kann; ein Plugin überlebt das.
+
+Die Abhängigkeit steht in `src-tauri/Cargo.toml` unter
+`target.'cfg(target_os = "android")'`. Ein Fehler darin kann den Desktop-Build
+also nicht anfassen — und der baut die Releases.
+
+**Nicht Jetpack Glance**, anders als in der README angekündigt, sondern
+RemoteViews. Glance ist Compose, und Compose bindet den Kotlin-Compiler an eine
+passende Version des Compose-Plugins — in einem Gradle-Projekt, dessen
+Kotlin-Version `tauri android init` vorgibt und mit jeder Tauri-Version ändern
+kann. RemoteViews kostet etwas mehr XML und hängt an nichts. Wer doch wechseln
+will: `WidgetStore` bleibt, ausgetauscht werden `PlannerWidgetProvider` und
+`PlannerWidgetService`.
+
+**Zu tun**, in dieser Reihenfolge:
+
+```bash
+# 1. Voraussetzungen: JDK 17, Android SDK + NDK, ANDROID_HOME, NDK_HOME
+# 2. Rust-Ziele für Android
+rustup target add aarch64-linux-android armv7-linux-androideabi \
+                  i686-linux-android x86_64-linux-android
+# 3. Gradle-Projekt erzeugen (schreibt src-tauri/gen/android/)
+npm run android:init
+# 4. Bauen und auf ein Gerät bringen
+npm run android:dev
+```
+
+Danach das Widget auf dem Homescreen ablegen, die App einmal öffnen — vorher
+steht dort „App einmal öffnen", weil noch kein Schnappschuss gespeichert ist.
+
+Drei Stellen, an denen der erste Build erfahrungsgemäß hängt:
+
+* **`compileSdk`/`minSdk`** in `plugins/planner-widget/android/build.gradle.kts`
+  (aktuell 34 und 24) müssen zu `gen/android/app/build.gradle.kts` passen.
+  Gradle sagt deutlich, wenn nicht.
+* **Findet Tauri das Plugin nicht** („plugin planner-widget not found"), fehlt
+  die `links`-Zeile in `plugins/planner-widget/Cargo.toml` oder
+  `gen/android/tauri.settings.gradle` kennt das Modul nicht. Über `links`
+  meldet das Build-Skript den Gradle-Pfad an `tauri-build` — ohne die Zeile
+  baut alles durch, und das Kotlin landet trotzdem nicht im APK.
+* **`planner://auth-callback` auf Android** ist nicht eingerichtet.
+  `tauri.conf.json` konfiguriert das Deep-Link-Plugin nur unter `desktop`.
+  Für die Google-Anmeldung auf Android braucht es dort einen `mobile`-Block
+  bzw. einen Intent-Filter. Betrifft das Widget nicht — aber die Anmeldung.
+
+### Die Capabilities sind dafür aufgeteilt worden
+
+`capabilities/default.json` enthielt `updater:default` und
+`process:allow-restart`. Beide Plugins sind in `Cargo.toml` auf Desktop
+beschränkt, es gibt sie auf Android also gar nicht — und eine Berechtigung für
+ein nicht vorhandenes Plugin lässt den Android-Build abbrechen, bevor eine
+Zeile Kotlin übersetzt wird. Jetzt: `default.json` (überall),
+`desktop.json`, `panel.json`, `android.json`.
+
+Das wäre der erste Fehler beim allerersten `android:init`-Versuch gewesen.
 
 ---
 
@@ -155,7 +266,12 @@ mussten Workflow-Dateien bisher von Hand eingespielt werden.
   weitergegeben werden.
 * **Drag & Drop** zum Umsortieren fehlt (`Alt+↑/↓` funktioniert). Die
   Datenseite ist fertig: `keyForIndex` in `lib/ordering.ts`.
-* **Android** — noch gar nichts. `npm run android:init` ist der Einstieg.
+* **Android** — Widget-Code liegt vollständig vor, das Gradle-Projekt fehlt
+  noch. Ablauf oben unter „Die Widgets".
+* **Haken im Android-Widget** gibt es bewusst nicht. Ein Abhaken auf dem
+  Homescreen müsste die App starten, Supabase erreichen und mit
+  Wiederholungsregeln umgehen — im Launcher-Prozess, ohne Netz-Garantie und
+  ohne Ort für eine Fehlermeldung. Das Widget zeigt an, es schreibt nicht.
 * **Offline-Schreiben** braucht PowerSync als weitere `Repository`-
   Implementierung.
 
@@ -206,6 +322,14 @@ npm run db:test      # 43 RLS-Prüfungen gegen Postgres im Container (braucht Do
 `npm run db:test` ist der wertvollste davon: er lässt zwei Testnutzer
 gegeneinander antreten und prüft, ob die Berechtigungen wirklich halten.
 Läuft in einer Transaktion mit `ROLLBACK`, hinterlässt nichts.
+
+Keiner der vier fasst Rust oder Kotlin an. Nach Änderungen an `src-tauri/`
+gehört deshalb dazu:
+
+```bash
+cd src-tauri && cargo check          # Desktop
+cargo check --target aarch64-linux-android   # Android, braucht das NDK
+```
 
 ---
 

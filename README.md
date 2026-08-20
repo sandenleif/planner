@@ -55,8 +55,17 @@ Meldung heraus zurückholen, samt Unterpunkten.
 
 **Details je Aufgabe**: Notizen, Priorität, Wiederholung.
 
-**Desktop-Integration** — Tray-Symbol, Schließen versteckt statt beendet,
-`Strg+Umschalt+Leertaste` holt das Fenster von überall.
+**Desktop-Integration** — Tray-Symbol mit der Anzahl dessen, was heute ansteht,
+Schließen versteckt statt beendet, `Strg+Umschalt+Leertaste` klappt das Panel
+von überall auf.
+
+**Ein Panel, das bleiben darf.** Aus dem Tray-Symbol klappt eine kurze Ansicht
+auf: was heute fällig ist, ein Feld zum Notieren, die Listen mit ihren Zahlen.
+Die Stecknadel oben rechts heftet es an — dann verschwindet es nicht mehr beim
+Klick daneben, merkt sich seine Position und ist nach dem Neustart wieder da.
+
+**Homescreen-Widget auf Android** — dieselbe Übersicht als App-Widget: was
+heute fällig ist, Listenfarbe je Zeile, Tippen öffnet die App.
 
 ## Supabase einrichten
 
@@ -182,7 +191,14 @@ src/
 ├── features/       tasks, lists, search, share, settings
 ├── pages/          Übersicht, Agenda (Heute/Demnächst), Liste, Einladung
 ├── lib/            parseQuickAdd, ordering (Fractional Index), date, platform
+│   ├── desktop.ts          Panel: anheften, Position, Weg ins Hauptfenster
+│   └── widget.ts           der Stand für Tray-Symbol und Homescreen-Widget
 └── ui/             Dialog, Toaster
+
+src-tauri/
+├── src/lib.rs      Tray, Panel, globales Kürzel, Deep-Link, Updater
+├── capabilities/   Berechtigungen, je Plattform getrennt
+└── plugins/planner-widget/   Android-Widget: Rust-Brücke + Kotlin
 ```
 
 Vier Entscheidungen, die den Rest erklären:
@@ -227,15 +243,51 @@ Das Panel ist ein eigenes Fenster (`panel`) auf derselben React-App, Route
 Navigation. Was man dort tut, dauert Sekunden; alles andere führt über einen
 Knopf ins Hauptfenster.
 
-Rechtsklick aufs Symbol öffnet weiterhin das Menü mit „Hauptfenster öffnen"
-und „Beenden". Das Hauptfenster zu schließen beendet die App nicht — sie lebt
-in der Menüleiste weiter.
+Rechtsklick aufs Symbol öffnet das Menü mit „Panel anzeigen", „Hauptfenster
+öffnen" und „Beenden" — der erste Eintrag ist für Linux, wo Tray-Symbole je
+nach Desktop-Umgebung gar kein Linksklick-Ereignis liefern. Das Hauptfenster
+zu schließen beendet die App nicht — sie lebt in der Menüleiste weiter.
+
+#### Angeheftet wird das Panel zum Widget
+
+Die Stecknadel oben rechts schaltet um. Angeheftet bleibt dasselbe Fenster
+stehen, statt beim Klick daneben zu verschwinden, merkt sich seine Position und
+ist nach einem Neustart wieder da.
+
+Über das Verstecken bei Fokusverlust entscheidet Rust in `on_window_event` —
+deshalb liegt der laufende Zustand dort und nicht im Frontend. Eine Rückfrage
+in die WebView wäre ein Wettlauf: das Panel wäre weg, bevor die Antwort da ist.
+Was der Nutzer eingestellt hat, merkt sich umgekehrt das Frontend
+(`localStorage`) und meldet es beim Start einmal nach unten — Rust hat für so
+etwas keinen Ort, der einen Neustart überlebt.
+
+Die gemerkte Position wird beim Wiederherstellen gegen die angeschlossenen
+Bildschirme geprüft. Wer das Panel im Büro auf den zweiten Monitor schiebt und
+den Rechner zu Hause ohne diesen startet, bekäme sonst ein Fenster bei
+x = 2400 — sichtbar nirgends, und weil es kein Taskleistensymbol hat, auch
+nicht zurückzuholen.
+
+#### Die Zahl am Symbol
+
+Das Tray-Symbol trägt, wie viel heute noch offen ist: auf macOS als Zahl neben
+dem Symbol, überall als Kurzinfo beim Darüberfahren. Gerechnet wird das in
+`src/lib/widget.ts` — derselbe Schnappschuss, der auf Android ins
+Homescreen-Widget geht. Abgeschickt wird er aus der Shell des Hauptfensters,
+nie aus dem Panel: das läuft in einer eigenen WebView mit eigenem Query-Cache,
+und zwei Absender für dieselbe Zahl werden früher oder später uneinig.
 
 ### Automatische Updates
 
 Die Desktop-App prüft beim Start (und alle sechs Stunden) bei GitHub Releases,
 ob es eine neuere Version gibt, und bietet sie als Meldung an. Geladen und
 eingespielt wird erst auf Klick, neu gestartet ebenfalls.
+
+Unter **Einstellungen → Programm** stehen die laufende Version und ein Knopf
+„Nach Updates suchen". Beide Wege teilen sich Abfrage und Installation; der
+Unterschied ist die Antwort, wenn es nichts zu holen gibt. Die automatische
+Prüfung schweigt dann — sonst meldete sie sich alle sechs Stunden, um nichts
+zu sagen. Die angestoßene antwortet, denn „keine Meldung" ist von „hat nicht
+funktioniert" nicht zu unterscheiden.
 
 Die Pakete sind signiert. Der öffentliche Schlüssel steht in
 `tauri.conf.json`, der private gehört als GitHub-Secret hinterlegt und **nie
@@ -295,6 +347,48 @@ npm run android:init    # einmalig, erzeugt src-tauri/gen/android
 npm run android:dev     # auf Gerät oder Emulator
 npm run android:build   # APK/AAB
 ```
+
+### Das Homescreen-Widget
+
+Liegt in `src-tauri/plugins/planner-widget/` — einem eigenen Tauri-Plugin mit
+Rust-Brücke und Gradle-Bibliothek, nicht als Änderung am erzeugten
+Gradle-Projekt: `tauri android init` kann `gen/android` jederzeit neu
+schreiben, ein Plugin überlebt das.
+
+```
+plugins/planner-widget/
+├── src/lib.rs                 nimmt den Schnappschuss entgegen, reicht ihn durch
+├── permissions/default.toml   erlaubt genau einen Befehl: update_snapshot
+└── android/src/main/
+    ├── PlannerWidgetPlugin.kt   die Tauri-Seite: @Command updateSnapshot
+    ├── WidgetStore.kt           SharedPreferences als Ablage zwischen beiden
+    ├── PlannerWidgetProvider.kt Kopfzeile, Klickziele, Neuzeichnen
+    └── PlannerWidgetService.kt  füllt die Liste (RemoteViewsFactory)
+```
+
+Warum es die Brücke braucht: Ein App-Widget wird vom Launcher gezeichnet und
+kann die Daten der App nicht lesen — die IndexedDB der WebView schon gar nicht.
+Es braucht also eine Ablage, in die die App schreibt, **und** ein Signal an den
+`AppWidgetManager`. Ohne das zweite zeigte das Widget den neuen Stand erst beim
+nächsten Aktualisierungslauf des Systems.
+
+`updatePeriodMillis` ist bewusst `0`. Ein Wecklauf könnte ohnehin nur denselben
+gespeicherten Stand neu zeichnen; neue Daten gäbe es nur, wenn die App liefe.
+Aktualisiert wird deshalb, wenn die App etwas ändert, und auf Tippen des
+Knopfes — alles andere wäre Batterieverbrauch ohne Ertrag. Ist der Stand älter
+als zwölf Stunden, sagt das Widget das in der Kopfzeile, statt „Heute 14:30"
+über etwas zu schreiben, das von vorgestern ist.
+
+**RemoteViews statt Jetpack Glance.** Glance ist Compose, und Compose bindet
+den Kotlin-Compiler an eine passende Version des Compose-Plugins — in einem
+Gradle-Projekt, dessen Kotlin-Version Tauri vorgibt. RemoteViews kostet etwas
+mehr XML und hängt dafür an nichts, was beim nächsten Tauri-Update
+auseinanderfällt.
+
+**Das Widget schreibt nicht.** Kein Haken, kein Löschen. Das müsste die App
+starten, Supabase erreichen und mit Wiederholungsregeln umgehen — im
+Launcher-Prozess, ohne Netz-Garantie und ohne Ort für eine Fehlermeldung.
+Tippen öffnet die App, dort steht alles.
 
 ## Web ausliefern
 
@@ -415,8 +509,10 @@ gemeint ist.
    und sind durch `npm run db:test` abgesichert. Offen sind
    Passwort-zurücksetzen, E-Mail-Bestätigung, Rate-Limiting und der
    Deep-Link-Rücksprung für OAuth in Tauri.
-2. **Android-Widget** — Jetpack Glance im generierten Gradle-Projekt.
-   `Repository.getDueTasks()` ist genau die Abfrage, die das Widget braucht.
+2. **Android bauen** — Das Widget ist geschrieben
+   (`src-tauri/plugins/planner-widget/`), das Gradle-Projekt fehlt noch:
+   `npm run android:init` ist der Einstieg. Ablauf und die drei bekannten
+   Stolperstellen stehen in [STAND.md](STAND.md).
 3. **Echtes Offline-Schreiben** — [PowerSync](https://powersync.com) als
    `PowerSyncRepository`. Aktuell überlebt der Query-Cache zwar den Neustart,
    Schreiben braucht aber Netz.
