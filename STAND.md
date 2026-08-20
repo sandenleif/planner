@@ -233,10 +233,9 @@ Drei Stellen, an denen der erste Build erfahrungsgemäß hängt:
   `gen/android/tauri.settings.gradle` kennt das Modul nicht. Über `links`
   meldet das Build-Skript den Gradle-Pfad an `tauri-build` — ohne die Zeile
   baut alles durch, und das Kotlin landet trotzdem nicht im APK.
-* **`planner://auth-callback` auf Android** ist nicht eingerichtet.
-  `tauri.conf.json` konfiguriert das Deep-Link-Plugin nur unter `desktop`.
-  Für die Google-Anmeldung auf Android braucht es dort einen `mobile`-Block
-  bzw. einen Intent-Filter. Betrifft das Widget nicht — aber die Anmeldung.
+* **`planner://auth-callback` auf Android** braucht den `mobile`-Block unter
+  `plugins.deep-link` — siehe den Fallstrick weiter unten. Betrifft das Widget
+  nicht, aber die Anmeldung.
 
 ### Der Sync war zu langsam — zwei Ursachen
 
@@ -426,6 +425,35 @@ dabei nur Kandidaten, keine existierenden Dateien.
 Deshalb dürfen `APPLE_*`-Variablen nicht im `env:`-Block des Build-Schritts
 stehen: Tauri prüft nur auf Anwesenheit und versucht dann, ein leeres
 Zertifikat zu importieren.
+
+**Ein Intent-Filter im Manifest reicht für Deep Links nicht.** Das
+Deep-Link-Plugin prüft jeden ankommenden Intent ein zweites Mal, gegen seine
+eigene Konfiguration:
+
+```kotlin
+private fun isDeepLink(url: String): Boolean {
+    val config = this.config ?: return false
+    if (config.mobile.isEmpty()) {
+        return false
+    }
+```
+
+Solange `plugins.deep-link.mobile` leer ist, verwirft es alles — Android stellt
+den Intent zu, die App kommt in den Vordergrund, und dann passiert nichts.
+Genau so sah es in v1.0.4 aus.
+
+Und `mobile` ist **nicht** auf App Links über https beschränkt, wie es zunächst
+aussieht: `scheme` ist dort eine Liste, `host` ausdrücklich optional
+(*„Optional custom uri schemes dont NEED a host"*). Der Eintrag
+
+```json
+"mobile": [{ "scheme": ["planner"] }]
+```
+
+erledigt beides: Das Build-Skript des Plugins schreibt daraus den
+Intent-Filter ins Manifest, und zur Laufzeit nimmt es den Intent an. Der von
+Hand eingefügte Filter aus v1.0.4 ist damit weggefallen — er kam im APK an und
+half trotzdem nichts.
 
 **Fenster in `tauri.conf.json` gelten auch für Android.** Dort gibt es genau
 eine WebView, und Tauri baut sie aus der Fensterliste der Konfiguration. Weil

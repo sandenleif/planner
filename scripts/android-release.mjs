@@ -8,20 +8,18 @@
  * soll, muss also nach jedem init erneut hineingeschrieben werden — und genau
  * das tut diese Datei.
  *
- * Zwei Dinge kommen hinzu:
+ * Konkret geht es um die **Signatur**. Ohne sie entsteht ein Debug-APK,
+ * signiert mit dem Wegwerf-Schlüssel, den Gradle sich selbst erzeugt. Zum
+ * Ausprobieren reicht das; für etwas, das Nutzer behalten und aktualisieren
+ * sollen, nicht: Android akzeptiert eine Aktualisierung nur, wenn sie mit
+ * demselben Schlüssel signiert ist wie die installierte Version.
  *
- * 1. **Signatur.** Ohne sie entsteht ein Debug-APK, signiert mit dem
- *    Wegwerf-Schlüssel, den Gradle sich selbst erzeugt. Zum Ausprobieren
- *    reicht das; für etwas, das Nutzer behalten und aktualisieren sollen,
- *    nicht: Android akzeptiert eine Aktualisierung nur, wenn sie mit
- *    demselben Schlüssel signiert ist wie die installierte Version.
- *
- * 2. **Der OAuth-Rückweg.** Google schickt den Browser nach der Anmeldung auf
- *    `planner://auth-callback`. Damit Android weiß, dass diese Adresse zu
- *    dieser App gehört, braucht die Activity einen Intent-Filter. Der
- *    Deep-Link-Plugin-Block in tauri.conf.json deckt das nicht ab: dessen
- *    `mobile`-Abschnitt ist für App Links (https) gedacht, nicht für eigene
- *    Schemata.
+ * Der OAuth-Rückweg stand hier eine Version lang mit drin, als von Hand
+ * eingefügter Intent-Filter. Der landete auch im APK und half trotzdem nicht:
+ * Das Deep-Link-Plugin prüft jeden ankommenden Intent zusätzlich gegen seine
+ * eigene Konfiguration und verwirft ihn, solange `plugins.deep-link.mobile`
+ * leer ist. Der Eintrag dort erledigt jetzt beides — den Filter im Manifest
+ * und die Annahme zur Laufzeit.
  *
  * Ohne die Umgebungsvariablen tut das Skript nichts und meldet das. Ein
  * Debug-Build bleibt damit jederzeit möglich, auch ohne Zugriff auf die
@@ -33,12 +31,8 @@ import { resolve } from 'node:path'
 
 const ANDROID_DIR = resolve('src-tauri/gen/android')
 const GRADLE_FILE = resolve(ANDROID_DIR, 'app/build.gradle.kts')
-const MANIFEST_FILE = resolve(ANDROID_DIR, 'app/src/main/AndroidManifest.xml')
 const KEYSTORE_FILE = resolve(ANDROID_DIR, 'upload-keystore.p12')
 const PROPERTIES_FILE = resolve(ANDROID_DIR, 'keystore.properties')
-
-/** Das Schema, auf das Supabase nach der Google-Anmeldung zurückspringt. */
-const DEEP_LINK_SCHEME = 'planner'
 
 function main() {
   if (!existsSync(ANDROID_DIR)) {
@@ -47,8 +41,6 @@ function main() {
         'richtet ein vorhandenes Projekt her, es erzeugt keines.',
     )
   }
-
-  addDeepLinkIntentFilter()
 
   const signed = configureSigning()
   report(signed)
@@ -163,44 +155,6 @@ android {
 `,
   )
   console.log('Signatur-Block an build.gradle.kts angehängt.')
-}
-
-// ------------------------------------------------------------------ Deep-Link
-
-function addDeepLinkIntentFilter() {
-  const manifest = readFileSync(MANIFEST_FILE, 'utf8')
-
-  if (manifest.includes(`android:scheme="${DEEP_LINK_SCHEME}"`)) {
-    console.log('Intent-Filter für planner:// steht bereits im Manifest.')
-    return
-  }
-
-  const anchor = '</activity>'
-  const at = manifest.indexOf(anchor)
-  if (at === -1) {
-    fail(
-      `Kein </activity> in ${MANIFEST_FILE} gefunden. Der Tauri-Generator hat ` +
-        'das Manifest umgebaut — der Intent-Filter muss von Hand hinein, sonst ' +
-        'läuft die Google-Anmeldung auf Android ins Leere.',
-    )
-  }
-
-  const filter = `
-            <!-- Rueckweg aus der Google-Anmeldung. Ohne diesen Filter kennt
-                 Android das Schema nicht, der Browser bleibt auf einer leeren
-                 Seite stehen und die App wartet vergeblich. Eingefuegt von
-                 scripts/android-release.mjs, weil gen/android erzeugter Code
-                 ist und bei jedem init neu entsteht. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="${DEEP_LINK_SCHEME}" />
-            </intent-filter>
-        `
-
-  writeFileSync(MANIFEST_FILE, manifest.slice(0, at) + filter + manifest.slice(at))
-  console.log(`Intent-Filter für ${DEEP_LINK_SCHEME}:// ins Manifest eingefügt.`)
 }
 
 // ------------------------------------------------------------------- Ausgabe

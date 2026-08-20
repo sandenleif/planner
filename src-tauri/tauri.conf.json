@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Planner",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "identifier": "de.leifsanden.planner",
   "build": {
     "frontendDist": "../dist",
@@ -85,7 +85,14 @@
         "schemes": [
           "planner"
         ]
-      }
+      },
+      "mobile": [
+        {
+          "scheme": [
+            "planner"
+          ]
+        }
+      ]
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEyQkNCQjRDOUNFNTEzMzYKUldRMkUrV2NUTHU4b3RFVmlsNGRXUHdyOTZ1b3d0M0JIbDVPekxrMWttNWFuTVN6a2dCdUtGaE8K",

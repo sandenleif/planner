@@ -162,10 +162,10 @@ jobs:
       - name: Gradle-Projekt erzeugen
         run: npm run android:init
 
-      # Signatur und der Intent-Filter für planner:// müssen nach jedem init
-      # neu hinein - gen/android ist erzeugter Code. Ohne Keystore-Secrets tut
-      # das Skript nichts und meldet es; dann bleibt es beim Debug-Build.
-      - name: Release-Signatur und Deep-Link einrichten
+      # Die Signatur muss nach jedem init neu hinein - gen/android ist
+      # erzeugter Code. Ohne Keystore-Secrets tut das Skript nichts und meldet
+      # es; dann bleibt es beim Debug-Build.
+      - name: Release-Signatur einrichten
         id: signing
         run: npm run android:release-setup
         env:
