@@ -6,6 +6,8 @@ Eine Codebase (React + TypeScript), drei Auslieferungswege: der Vite-Build ist
 die Web-App, Tauri v2 verpackt denselben Build als Desktop-Programm und als
 Android-APK.
 
+**Aktueller Arbeitsstand, offene Punkte und Fallstricke: [STAND.md](STAND.md).**
+
 ## Sofort starten
 
 ```bash
@@ -311,7 +313,20 @@ Die Konfiguration steht in `wrangler.jsonc` — rein statische Auslieferung aus
 | Build output directory | `dist` |
 | Node-Version | aus `.node-version` (22) |
 
-Aus der Kommandozeile: `npx wrangler deploy` (nach `npm run build`).
+Aus der Kommandozeile: **`npm run deploy`**.
+
+Nicht `wrangler deploy` verwenden. Das lädt hoch, was gerade in `dist/`
+liegt — ohne zu prüfen, womit es gebaut wurde. So ging zweimal eine Version
+ohne Login live, ohne dass irgendetwas fehlschlug. `npm run deploy` räumt
+`dist/` weg, baut frisch und bricht ab, wenn die Supabase-Konfiguration nicht
+im Bundle steht:
+
+```
+✗ Das Bundle enthaelt die Supabase-Konfiguration nicht.
+  Es wird NICHT hochgeladen.
+```
+
+Für einen bewusst loginlosen Deploy: `npm run deploy -- --local`.
 
 #### Die Umgebungsvariablen sind der Knackpunkt
 
