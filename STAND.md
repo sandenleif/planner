@@ -116,6 +116,26 @@ von vorhin — das Fenster wird nie neu montiert) und ein Menüeintrag „Panel
 anzeigen" fürs Tray-Menü, weil Linux kein verlässliches Linksklick-Ereignis
 für Tray-Symbole hat.
 
+Das Panel-Fenster ist außerdem **transparent** geworden
+(`tauri.conf.json`) und trägt auf macOS das Popover-Material. Vorher war es
+ein randloses, eckiges, opakes Rechteck — auf macOS das sicherste Zeichen
+dafür, dass etwas nicht dorthin gehört. Runde Ecken kann ein randloses Fenster
+nur haben, wenn der Rest wirklich durchsichtig ist; deshalb malt der Body auf
+der Panel-Route keine Farbe mehr (`.is-panel` in `index.css`).
+
+Auf- und Zuklappen sind animiert. Ein Fenster selbst lässt sich nicht
+animieren — es ist von einem Bild aufs nächste weg. Also läuft die Bewegung im
+Frontend, und Rust wartet sie ab: `hide_panel_window` kündigt über
+`panel://hiding` an, wartet `HIDE_DELAY` (135 ms) und versteckt dann. Ein
+Zähler in `PanelState` verhindert dabei den offensichtlichen Fehler — klappt
+jemand innerhalb dieser 135 ms wieder auf, lässt das wartende Verstecken das
+Fenster in Ruhe.
+
+Falls das Popover-Material auf Windows oder Linux Ärger macht: Es ist der
+Block `windowEffects` am Panel-Fenster in `tauri.conf.json`, eine Zeile zum
+Entfernen. Die Fläche darunter ist zu 92 % deckend, sieht ohne Material also
+schlichter aus, aber nie kaputt.
+
 Dazu kann das Panel jetzt bearbeiten: Zeile antippen klappt Titel,
 Fälligkeit, Priorität und Löschen auf, eine Listenkachel führt eine Ebene
 tiefer in die Liste. Der Fälligkeits-Knopf ist derselbe wie im Hauptfenster —
@@ -154,21 +174,37 @@ kann. RemoteViews kostet etwas mehr XML und hängt an nichts. Wer doch wechseln
 will: `WidgetStore` bleibt, ausgetauscht werden `PlannerWidgetProvider` und
 `PlannerWidgetService`.
 
-**Zu tun**, in dieser Reihenfolge:
+**Der APK-Build läuft jetzt in CI.** Der Workflow hat einen Job `Android
+(APK)`, der nach den Desktop-Builds läuft: er richtet JDK 17 ein, setzt
+`NDK_HOME` (das Runner-Image lässt genau diese Variable aus), führt
+`android:init` aus und baut ein **Debug-APK für arm64**. Das Ergebnis hängt am
+Release und liegt zusätzlich als Artefakt am Workflow-Lauf.
+
+Debug, weil ein Release-APK einen Keystore bräuchte, den es noch nicht gibt —
+Gradle signiert Debug-Builds selbst. Zum Installieren auf dem Telefon reicht
+das; Android fragt beim Öffnen der Datei nach der Erlaubnis für „unbekannte
+Apps". Wegen `debugApplicationIdSuffix` heißt das Paket
+`de.leifsanden.planner.debug` und kollidiert später nicht mit einem
+Release-Build.
+
+`gen/android` wird bewusst **nicht** eingecheckt: Es ist erzeugter Code, und
+`tauri android init` schreibt ihn zur jeweils installierten Tauri-Version
+passend. In CI entsteht er bei jedem Lauf neu.
+
+Lokal geht es weiterhin so — dafür braucht es die Werkzeugkette auf dem
+Rechner:
 
 ```bash
-# 1. Voraussetzungen: JDK 17, Android SDK + NDK, ANDROID_HOME, NDK_HOME
-# 2. Rust-Ziele für Android
+# Voraussetzungen: JDK 17, Android SDK + NDK, ANDROID_HOME, NDK_HOME
 rustup target add aarch64-linux-android armv7-linux-androideabi \
                   i686-linux-android x86_64-linux-android
-# 3. Gradle-Projekt erzeugen (schreibt src-tauri/gen/android/)
 npm run android:init
-# 4. Bauen und auf ein Gerät bringen
 npm run android:dev
 ```
 
-Danach das Widget auf dem Homescreen ablegen, die App einmal öffnen — vorher
-steht dort „App einmal öffnen", weil noch kein Schnappschuss gespeichert ist.
+Nach der Installation das Widget auf dem Homescreen ablegen und die App einmal
+öffnen — vorher steht dort „App einmal öffnen", weil noch kein Schnappschuss
+gespeichert ist.
 
 Drei Stellen, an denen der erste Build erfahrungsgemäß hängt:
 

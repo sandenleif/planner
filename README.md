@@ -359,6 +359,11 @@ npm run android:dev     # auf Gerät oder Emulator
 npm run android:build   # APK/AAB
 ```
 
+**Ohne lokale Werkzeugkette**: Der Release-Workflow hat einen Job `Android
+(APK)`. Er baut ein Debug-APK für arm64, hängt es an das Release und legt es
+zusätzlich als Artefakt am Lauf ab. Damit kommt man auf ein Gerät, ohne SDK
+und NDK selbst zu installieren.
+
 ### Das Homescreen-Widget
 
 Liegt in `src-tauri/plugins/planner-widget/` — einem eigenen Tauri-Plugin mit

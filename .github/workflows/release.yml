@@ -109,6 +109,91 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
+  # Android baut nicht in der Matrix oben mit: tauri-action kennt nur die
+  # Desktop-Bundles. Der Weg dorthin ist ein eigener Job mit eigener
+  # Werkzeugkette — dafür braucht niemand lokal ein SDK, der Runner bringt es
+  # mit.
+  android:
+    name: Android (APK)
+    needs: build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # Gradle braucht ein JDK. Das Image bringt mehrere mit; 17 ist das, mit
+      # dem das Android-Gradle-Plugin arbeitet.
+      - name: JDK einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # SDK und NDK sind auf dem Runner vorhanden, aber Tauri sucht das NDK
+      # unter NDK_HOME - und genau diese Variable setzt das Image nicht.
+      - name: NDK-Pfad durchreichen
+        run: echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+
+      - name: Rust einrichten
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Nur arm64: jedes Android-Gerät der letzten Jahre ist arm64, und
+          # jedes weitere Ziel kostet einen kompletten Durchlauf.
+          targets: aarch64-linux-android
+
+      - name: Rust-Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          key: android
+
+      - name: npm-Pakete
+        run: npm ci
+
+      # Erzeugt src-tauri/gen/android. Bewusst bei jedem Lauf neu statt im
+      # Repo: das Projekt ist erzeugter Code, und `tauri android init` schreibt
+      # es zur jeweils installierten Tauri-Version passend.
+      - name: Gradle-Projekt erzeugen
+        run: npm run android:init
+
+      # --debug, weil ein Release-APK einen Keystore bräuchte, den es noch
+      # nicht gibt. Ein Debug-APK signiert Gradle selbst und lässt sich ganz
+      # normal auf ein Gerät ziehen - zum Ausprobieren genau das Richtige.
+      - name: APK bauen
+        run: npm run android:build -- --debug --apk --target aarch64
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
+
+      - name: Zeigen, was entstanden ist
+        run: find src-tauri/gen/android -name '*.apk' -exec ls -lh {} +
+
+      # Auch ohne Tag abholbar - so lässt sich ein Android-Build über
+      # workflow_dispatch ausprobieren, ohne eine Version zu verbrennen.
+      - name: APK als Artefakt ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: planner-android-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      # gh ist auf dem Runner vorinstalliert - das spart eine weitere Action
+      # in der Lieferkette, nur um eine Datei anzuhängen.
+      - name: APK an das Release hängen
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            $(find src-tauri/gen/android -name '*.apk') --clobber
+
   # Läuft nach allen Plattformen und beantwortet die eine Frage, die man
   # sonst erst nach der Installation stellt.
   check:
