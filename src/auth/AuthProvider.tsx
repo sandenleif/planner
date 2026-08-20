@@ -98,8 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Desktop und Android: auf planner://auth-callback horchen.
+  //
+  // Nur im Hauptfenster. Die Rust-Seite sendet das Ereignis zwar gezielt
+  // dorthin, aber getCurrent() liefert beim Start in JEDEM Fenster die URL,
+  // mit der die App geoeffnet wurde. Ohne diese Sperre wuerde das Panel
+  // denselben Code ein zweites Mal einloesen - und scheitern.
   useEffect(() => {
     if (!isTauri || !supabaseConfigured) return
+    if (window.location.hash.startsWith('#/panel')) return
 
     let unlisten: (() => void) | null = null
     let cancelled = false

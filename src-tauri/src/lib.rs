@@ -127,7 +127,12 @@ fn forward_deep_link(app: &AppHandle, url: &str) {
     }
 
     log::info!("Deep-Link empfangen");
-    let _ = app.emit(OAUTH_EVENT, url.to_string());
+
+    // emit_to statt emit: Haupt- und Panel-Fenster laden dieselbe App und
+    // wuerden beide auf den Rueckweg horchen. Ein PKCE-Code laesst sich aber
+    // nur EINMAL einloesen - das zweite Fenster bekaeme zwangslaeufig einen
+    // Fehler, und der landet vor den Augen des Nutzers.
+    let _ = app.emit_to(MAIN, OAUTH_EVENT, url.to_string());
 
     #[cfg(desktop)]
     show_main_window(app);
