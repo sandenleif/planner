@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      viewport-fit=cover: sonst liegt die Fokus-Leiste auf Android unter der
+      Gestenleiste. Kein user-scalable=no - das wuerde auch Pinch-Zoom
+      abschalten. Gegen den Zoom beim Doppeltippen hilft touch-action:
+      manipulation auf den Bedienelementen (siehe index.css).
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="description" content="Fokus, Aufgaben und Gewohnheiten" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Faerbt die Statusleiste auf Android passend zur App. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f8fb" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1d24" />
+    <title>Planner</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

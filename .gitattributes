@@ -1,0 +1,15 @@
+# Im Repository stehen überall LF. Ohne diese Datei checkt Git unter Windows
+# CRLF aus und committet es teils zurück - dann sieht jeder Diff auf macOS
+# oder im CI nach "ganze Datei geändert" aus.
+* text=auto eol=lf
+
+# Binärdateien nie anfassen.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.woff2 binary
+
+# Lockfiles in Diffs zusammenklappen - sie sind generiert und selten lesenswert.
+package-lock.json linguist-generated=true -diff
+src-tauri/Cargo.lock linguist-generated=true -diff

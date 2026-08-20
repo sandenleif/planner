@@ -1,0 +1,33 @@
+[package]
+name = "planner"
+version = "0.1.0"
+description = "Fokus, Aufgaben und Gewohnheiten"
+authors = ["Leif Sanden"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# Der Name muss zu `planner_lib::run()` in main.rs passen. cdylib/staticlib
+# braucht der Mobile-Build (Android laedt die App als native Bibliothek).
+name = "planner_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+# tray-icon ist kein Standard-Feature - ohne das gibt es kein Symbol im
+# Infobereich bzw. in der Menuezeile.
+tauri = { version = "2.11.3", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+
+# Nur Desktop: Android und iOS kennen weder globale Tastenkuerzel noch ein
+# Konzept von "eine Instanz pro Rechner".
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"

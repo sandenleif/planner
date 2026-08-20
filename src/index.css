@@ -1,0 +1,285 @@
+@import 'tailwindcss';
+
+/* Dark Mode per Klasse auf <html>, nicht nur per prefers-color-scheme -
+   sonst kann der Nutzer es nicht selbst umschalten. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    'Inter var', 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+
+  /* Gruen als Leitfarbe. Hue 152 liegt zwischen Wald und Salbei und
+     verträgt sich mit dem warmen Creme-Untergrund - ein kühles Blaugrün
+     würde daneben schmutzig wirken. */
+  --color-accent-50: oklch(0.965 0.025 152);
+  --color-accent-100: oklch(0.93 0.05 152);
+  --color-accent-200: oklch(0.87 0.085 152);
+  --color-accent-300: oklch(0.79 0.115 152);
+  --color-accent-400: oklch(0.7 0.135 152);
+  --color-accent-500: oklch(0.615 0.145 152);
+  --color-accent-600: oklch(0.53 0.135 152);
+  --color-accent-700: oklch(0.445 0.115 152);
+  --color-accent-800: oklch(0.37 0.09 152);
+  --color-accent-900: oklch(0.31 0.07 152);
+
+  --radius-card: 1rem;
+  --radius-tile: 1.25rem;
+}
+
+/* Semantische Flaechen. Ein Token pro Rolle, in beiden Themes definiert -
+   damit steht nirgends im Code ein `dark:bg-...`. */
+:root {
+  /* Echtes Creme (#f6edd7), nicht Weiss mit Hauch. Die Karten darauf sind
+     fast weiss (#fffcf4) - dieser Abstand ist es, der die Flaechen ueberhaupt
+     als Karten lesbar macht. */
+  --surface-app: oklch(0.946 0.03 88);
+  --surface-panel: oklch(0.99 0.01 88);
+  --surface-sunken: oklch(0.92 0.036 88);
+  --surface-hover: oklch(0.906 0.04 88);
+  --border-subtle: oklch(0.876 0.034 88);
+  --text-primary: oklch(0.26 0.018 75);
+  --text-muted: oklch(0.515 0.022 78);
+  --shadow-card: 0 1px 2px oklch(0.3 0.03 75 / 0.05),
+    0 6px 20px -10px oklch(0.3 0.03 75 / 0.15);
+  --shadow-tile: 0 1px 2px oklch(0.25 0.03 75 / 0.1),
+    0 12px 28px -14px oklch(0.25 0.05 75 / 0.45);
+  --shadow-tile-hover: 0 2px 4px oklch(0.25 0.03 75 / 0.12),
+    0 20px 40px -16px oklch(0.25 0.05 75 / 0.5);
+}
+
+.dark {
+  /* Auch dunkel warm halten - ein blaustichiges Dunkelgrau neben derselben
+     gruenen Leitfarbe sieht nach zwei verschiedenen Apps aus. */
+  --surface-app: oklch(0.215 0.012 80);
+  --surface-panel: oklch(0.262 0.014 80);
+  --surface-sunken: oklch(0.188 0.011 80);
+  --surface-hover: oklch(0.315 0.016 80);
+  --border-subtle: oklch(0.35 0.015 80);
+  --text-primary: oklch(0.94 0.006 85);
+  --text-muted: oklch(0.67 0.01 82);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.35), 0 6px 20px -10px oklch(0 0 0 / 0.4);
+  --shadow-tile: 0 1px 2px oklch(0 0 0 / 0.4), 0 12px 28px -14px oklch(0 0 0 / 0.6);
+  --shadow-tile-hover: 0 2px 4px oklch(0 0 0 / 0.45),
+    0 20px 40px -16px oklch(0 0 0 / 0.65);
+}
+
+@theme inline {
+  --color-app: var(--surface-app);
+  --color-panel: var(--surface-panel);
+  --color-sunken: var(--surface-sunken);
+  --color-hover: var(--surface-hover);
+  --color-subtle: var(--border-subtle);
+  --color-ink: var(--text-primary);
+  --color-muted: var(--text-muted);
+}
+
+@layer base {
+  html,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    /* dvh statt vh: auf Android schrumpft der Viewport beim Einblenden der
+       Adressleiste. Die safe-area-Paddings zaehlen dank border-box in die
+       Hoehe hinein, deshalb muss kein Kind sie nochmal beruecksichtigen. */
+    height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background-color: var(--surface-app);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  /* Text bleibt markierbar, alles andere nicht - sonst wirkt die Desktop-App
+     beim Ziehen von Zeilen wie ein Browser. Das -webkit-Praefix ist fuer die
+     WKWebView auf macOS noetig, nicht optional. */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable],
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+
+  /* Verhindert den Zoom beim Doppeltippen auf Checkboxen und Buttons, ohne
+     Pinch-Zoom zu blockieren - anders als user-scalable=no im Viewport-Tag. */
+  button,
+  input,
+  select,
+  textarea,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* Die Basis steht als gemeinsame Selektorliste, nicht als `@apply btn` in
+     den Varianten: Tailwind 4 laesst @apply nur noch auf echte Utilities zu,
+     nicht auf selbst definierte Komponentenklassen. */
+  .btn,
+  .btn-primary,
+  .btn-ghost,
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.625rem;
+    padding: 0.4375rem 0.875rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition-property: color, background-color, border-color, opacity;
+    transition-duration: 150ms;
+
+    &:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+  }
+
+  .btn-primary {
+    @apply bg-accent-700 text-white hover:bg-accent-800;
+  }
+  .btn-ghost {
+    @apply text-muted hover:bg-hover hover:text-ink;
+  }
+  .btn-outline {
+    @apply border border-subtle text-ink hover:bg-hover;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-subtle bg-panel px-3.5 py-2.5 text-sm
+           text-ink placeholder:text-muted focus:border-accent-500
+           focus:outline-none;
+  }
+
+  .card {
+    @apply rounded-[var(--radius-card)] border border-subtle bg-panel;
+    box-shadow: var(--shadow-card);
+  }
+
+  /*
+   * Kachel: farbige Flaeche mit weisser Schrift.
+   *
+   * Die Hintergrundfarbe kommt als --tile-color aus dem Markup (die Farbe der
+   * jeweiligen Liste). Der Verlauf darueber ist kein Selbstzweck: eine rein
+   * flaechige Farbe wirkt bei dieser Groesse tot, ein leichter Lichtabfall von
+   * oben gibt der Kachel Koerper.
+   */
+  .tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    padding: 1.25rem;
+    color: white;
+    background-color: var(--tile-color, var(--color-accent-700));
+    background-image: linear-gradient(
+      160deg,
+      oklch(1 0 0 / 0.16) 0%,
+      oklch(1 0 0 / 0.04) 42%,
+      oklch(0 0 0 / 0.1) 100%
+    );
+    box-shadow: var(--shadow-tile);
+    transition:
+      transform 160ms cubic-bezier(0.2, 0, 0.2, 1),
+      box-shadow 160ms cubic-bezier(0.2, 0, 0.2, 1);
+  }
+
+  .tile:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-tile-hover);
+  }
+
+  .tile:active {
+    transform: translateY(-1px);
+  }
+
+  /* Auf Touch-Geraeten gibt es kein Hover - der Schwebe-Effekt wuerde dort
+     nach dem Antippen haengenbleiben. */
+  @media (pointer: coarse) {
+    .tile:hover {
+      transform: none;
+      box-shadow: var(--shadow-tile);
+    }
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+/* Wer "Bewegung reduzieren" eingestellt hat, bekommt die Einblendungen
+   ohne Versatz - die Elemente erscheinen einfach. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Die native Titelleiste bleibt an; diese Zone macht auf dem Desktop
+   zusaetzlich den App-Header ziehbar. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] a {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}

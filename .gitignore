@@ -1,0 +1,31 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Umgebungsvariablen - .env.example ist die eingecheckte Vorlage
+.env
+.env.*
+!.env.example
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# Android (wird von `tauri android init` erzeugt)
+src-tauri/gen/android/.gradle
+src-tauri/gen/android/local.properties
+src-tauri/gen/android/app/build
+src-tauri/gen/android/build
+*.keystore
+keystore.properties
+
+# Editoren / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Build-Zwischenstände
+*.tsbuildinfo
