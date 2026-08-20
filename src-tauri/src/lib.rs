@@ -96,6 +96,50 @@ fn panel_is_pinned(app: &AppHandle) -> bool {
 
 // ------------------------------------------------------------------ Fenster
 
+/// Legt das Menueleisten-Panel an.
+///
+/// Bewusst hier und nicht in tauri.conf.json: Auf Android gibt es genau eine
+/// WebView, und Tauri baut sie aus der Fensterliste der Konfiguration. Stand
+/// das Panel dort mit, startete die Android-App in der Panel-Ansicht - mit dem
+/// Hinweis "im Hauptfenster anmelden" und einem Knopf, der auf Android nichts
+/// tut, weil der zugehoerige Befehl #[cfg(desktop)] ist. Genau so ist es
+/// passiert.
+///
+/// Zur Laufzeit erzeugt ist das Fenster damit an dieselbe Bedingung gebunden
+/// wie alles andere, was es braucht: cfg(desktop).
+#[cfg(desktop)]
+fn create_panel_window(app: &AppHandle) -> tauri::Result<()> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    let builder = WebviewWindowBuilder::new(app, PANEL, WebviewUrl::App("index.html#/panel".into()))
+        .title("Planner")
+        .inner_size(380.0, 520.0)
+        .resizable(false)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .visible(false)
+        // Randlos allein genuegt nicht fuer runde Ecken - dafuer muss der Rest
+        // wirklich durchsichtig sein. Die sichtbare Flaeche malt das Frontend.
+        .transparent(true);
+
+    // Das Popover-Material gibt es nur auf macOS. Auf den anderen Plattformen
+    // traegt die knapp deckende Flaeche aus index.css den Panel allein.
+    #[cfg(target_os = "macos")]
+    let builder = {
+        use tauri::utils::config::{WindowEffect, WindowEffectState, WindowEffectsConfig};
+        builder.effects(WindowEffectsConfig {
+            effects: vec![WindowEffect::Popover],
+            state: Some(WindowEffectState::Active),
+            radius: Some(14.0),
+            color: None,
+        })
+    };
+
+    builder.build()?;
+    Ok(())
+}
+
 #[cfg(desktop)]
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {
@@ -493,6 +537,7 @@ pub fn run() {
 
             #[cfg(desktop)]
             {
+                create_panel_window(app.handle())?;
                 setup_tray(app.handle())?;
                 setup_global_shortcut(app.handle())?;
             }

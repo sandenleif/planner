@@ -1,4 +1,4 @@
-import { isTauri } from './platform'
+import { isDesktop, isTauri } from './platform'
 
 /**
  * Brücke vom Menüleisten-Panel zum Hauptfenster.
@@ -9,10 +9,13 @@ import { isTauri } from './platform'
  * steht in src-tauri/capabilities/ und bleibt so eng.
  */
 export async function openMainWindow(route?: string): Promise<void> {
-  if (!isTauri) {
-    // Im Browser gibt es kein zweites Fenster - dort ist das Panel ohnehin
-    // nur über /#/panel erreichbar, also einfach navigieren.
-    if (route) window.location.hash = `#${route}`
+  if (!isDesktop) {
+    // Im Browser und auf Android gibt es kein zweites Fenster - dort ist das
+    // Panel ohnehin nur über /#/panel erreichbar, also einfach navigieren.
+    // Bewusst isDesktop statt isTauri: Auf Android ist isTauri wahr, der
+    // Rust-Befehl dahinter aber #[cfg(desktop)] und damit ein Aufruf ins
+    // Leere - ein Knopf, der nichts tut.
+    window.location.hash = `#${route ?? '/'}`
     return
   }
 

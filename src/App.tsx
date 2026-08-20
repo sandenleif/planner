@@ -16,7 +16,7 @@ import { ListPage } from '@/pages/ListPage'
 import { PanelPage } from '@/pages/PanelPage'
 import { useTheme } from '@/app/theme'
 import { useWidgetSync } from '@/app/widgetSync'
-import { hasModKey, modKeyLabel } from '@/lib/platform'
+import { hasModKey, isAndroid, modKeyLabel } from '@/lib/platform'
 import { startUpdateChecks } from '@/lib/updater'
 import { Toaster } from '@/ui/Toaster'
 
@@ -45,7 +45,12 @@ export function App() {
   // Anmeldeformular in einem 380 Pixel breiten Popover ohne Schliessknopf.
   // Das Panel zeigt stattdessen einen kurzen Hinweis und fuehrt ins
   // Hauptfenster.
-  if (location.pathname === '/panel') {
+  //
+  // Die Abfrage auf Android ist ein Sicherheitsnetz: Dort gibt es nur eine
+  // WebView, und wenn dort je wieder #/panel landet, gehoert die App-Ansicht
+  // hin und nicht ein Panel mit einem Knopf ins Hauptfenster, das es auf
+  // Android gar nicht gibt.
+  if (location.pathname === '/panel' && !isAndroid) {
     return <PanelPage />
   }
 

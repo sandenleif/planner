@@ -427,6 +427,24 @@ Deshalb dürfen `APPLE_*`-Variablen nicht im `env:`-Block des Build-Schritts
 stehen: Tauri prüft nur auf Anwesenheit und versucht dann, ein leeres
 Zertifikat zu importieren.
 
+**Fenster in `tauri.conf.json` gelten auch für Android.** Dort gibt es genau
+eine WebView, und Tauri baut sie aus der Fensterliste der Konfiguration. Weil
+das Panel dort mit stand, startete die Android-App in der Panel-Ansicht: der
+Hinweis „Für deine Listen musst du dich anmelden" plus ein Knopf „Im
+Hauptfenster anmelden", der nichts tat — der Befehl dahinter ist
+`#[cfg(desktop)]`. Das Panel entsteht deshalb jetzt zur Laufzeit
+(`create_panel_window`) und hängt damit an derselben Bedingung wie alles
+andere, was es braucht.
+
+Das war in v1.0.3 und ist der Grund, warum das APK daraus unbrauchbar war.
+
+**`transparent: true` braucht auf macOS das Cargo-Feature
+`macos-private-api`.** Die Einstellung `macOSPrivateApi` in `tauri.conf.json`
+allein genügt nicht: Ohne das Feature gibt es `transparent()` am
+`WebviewWindowBuilder` auf macOS gar nicht, und ein per Konfiguration
+transparentes Fenster lässt Tauri zur Laufzeit abbrechen. Der Build läuft dabei
+durch — der Fehler zeigt sich erst beim Starten.
+
 **Tauri-Capabilities: `allow-*` heißt nicht „erlaubt".** Bei manchen
 Berechtigungen wird nur der Befehl freigeschaltet, der zugehörige Scope kommt
 aus einer zweiten Berechtigung. Bei Zweifeln in

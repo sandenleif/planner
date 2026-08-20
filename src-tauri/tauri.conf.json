@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Planner",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "de.leifsanden.planner",
   "build": {
     "frontendDist": "../dist",
@@ -23,25 +23,6 @@
         "fullscreen": false,
         "center": true,
         "titleBarStyle": "Visible"
-      },
-      {
-        "label": "panel",
-        "url": "index.html#/panel",
-        "title": "Planner",
-        "width": 380,
-        "height": 520,
-        "resizable": false,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "visible": false,
-        "focus": true,
-        "transparent": true,
-        "windowEffects": {
-          "effects": ["popover"],
-          "state": "active",
-          "radius": 14
-        }
       }
     ],
     "security": {

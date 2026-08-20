@@ -1,6 +1,6 @@
 [package]
 name = "planner"
-version = "1.0.3"
+version = "1.0.4"
 description = "Fokus, Aufgaben und Gewohnheiten"
 authors = ["Leif Sanden"]
 license = ""
@@ -23,7 +23,11 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 # tray-icon ist kein Standard-Feature - ohne das gibt es kein Symbol im
 # Infobereich bzw. in der Menuezeile.
-tauri = { version = "2.11.3", features = ["tray-icon"] }
+# macos-private-api ist fuer das transparente Panel-Fenster noetig: Ohne das
+# Feature ist WebviewWindowBuilder::transparent() auf macOS gar nicht erst
+# vorhanden, und ein per Konfiguration transparentes Fenster laesst Tauri zur
+# Laufzeit abbrechen.
+tauri = { version = "2.11.3", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-log = "2"
 # OAuth-Rueckweg: Google schickt den Code an planner://auth-callback, das
 # System reicht ihn an die laufende App weiter.
