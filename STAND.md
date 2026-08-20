@@ -318,9 +318,11 @@ Für die Workflow-Datei wurde ein Fine-grained PAT verwendet und im Chat
 weitergegeben. Widerrufen unter
 <https://github.com/settings/personal-access-tokens>.
 
-Für künftige Workflow-Änderungen braucht ein Token die Berechtigung
-**Workflows: Read and write** — das normale Git-Login hat sie nicht, deshalb
-mussten Workflow-Dateien bisher von Hand eingespielt werden.
+Für Workflow-Änderungen braucht ein Token die Berechtigung **Workflows: Read
+and write**. Die auf diesem Rechner hinterlegten Zugangsdaten haben sie: Der
+Android-Job in `release.yml` ließ sich am 20. August normal pushen. Der frühere
+Umweg über das Einfügen von Hand ist also nicht mehr nötig — wohl aber auf
+einem Rechner, dessen Token die Berechtigung nicht hat.
 
 ### 5. Kleinere offene Fäden
 
