@@ -48,7 +48,9 @@ Pfeiltasten zum Wählen, Enter zum Springen.
 Überfälliges zuoberst.
 
 **Geteilte Listen** — Einladung per E-Mail, Rollen Besitzer/Bearbeiten/Lesen,
-Live-Sync über Supabase Realtime.
+Live-Sync über Supabase Realtime. Das Abo hängt an allen sichtbaren Listen,
+nicht an der geöffneten: sonst bekämen Startseite, Agenda und das
+Menüleisten-Panel Fremdänderungen erst beim nächsten Refetch mit.
 
 **Rückgängig statt Rückfrage.** Gelöschte Aufgaben lassen sich aus der
 Meldung heraus zurückholen, samt Unterpunkten.
@@ -239,9 +241,18 @@ Notieren, und die Listen als Kacheln mit der Zahl offener Aufgaben.
 `Strg+Umschalt+Leertaste` öffnet es von überall.
 
 Das Panel ist ein eigenes Fenster (`panel`) auf derselben React-App, Route
-`#/panel`. Es bekommt bewusst nicht die Shell — keine Seitenleiste, keine
-Navigation. Was man dort tut, dauert Sekunden; alles andere führt über einen
-Knopf ins Hauptfenster.
+`#/panel`. Es bekommt bewusst nicht die Shell — keine Seitenleiste, kein
+Kopfbalken.
+
+**Bearbeiten geht dort auch.** Ein Tipp auf eine Zeile klappt sie auf: Titel,
+Fälligkeit, Priorität, Löschen. Eine Listenkachel führt eine Ebene tiefer in
+die Liste, der Pfeil wieder zurück. Das ist kein Widerspruch zum Grundsatz
+„ein Panel, aus dem man herausnavigiert, ist ein Fenster mit falschem Rahmen"
+— hier navigiert man nicht heraus, sondern innerhalb.
+
+Was darüber hinausgeht, führt weiter über einen Knopf ins Hauptfenster:
+Listen anlegen und umsortieren, Unterpunkte umhängen, Notizen, Wiederholung,
+Teilen. Ein 380 Pixel breites Popover ist dafür der falsche Ort.
 
 Rechtsklick aufs Symbol öffnet das Menü mit „Panel anzeigen", „Hauptfenster
 öffnen" und „Beenden" — der erste Eintrag ist für Linux, wo Tray-Symbole je

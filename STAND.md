@@ -116,8 +116,14 @@ von vorhin — das Fenster wird nie neu montiert) und ein Menüeintrag „Panel
 anzeigen" fürs Tray-Menü, weil Linux kein verlässliches Linksklick-Ereignis
 für Tray-Symbole hat.
 
+Dazu kann das Panel jetzt bearbeiten: Zeile antippen klappt Titel,
+Fälligkeit, Priorität und Löschen auf, eine Listenkachel führt eine Ebene
+tiefer in die Liste. Der Fälligkeits-Knopf ist derselbe wie im Hauptfenster —
+`DueBadge` ist dafür aus `TaskRow.tsx` in eine eigene Datei gewandert.
+
 **Zu tun:** `npm run desktop:dev`, dann der Reihe nach: Zahl am Symbol stimmt,
-Anheften hält, Position überlebt den Neustart, Aufklappen zeigt frische Daten.
+Anheften hält, Position überlebt den Neustart, Aufklappen zeigt frische Daten,
+Bearbeiten und Löschen im Panel greifen durch.
 
 Ebenfalls neu und ebenfalls ungetestet: **Einstellungen → Programm** zeigt die
 laufende Version und sucht auf Knopfdruck nach Updates. Das Suchen selbst ist
@@ -178,6 +184,31 @@ Drei Stellen, an denen der erste Build erfahrungsgemäß hängt:
   `tauri.conf.json` konfiguriert das Deep-Link-Plugin nur unter `desktop`.
   Für die Google-Anmeldung auf Android braucht es dort einen `mobile`-Block
   bzw. einen Intent-Filter. Betrifft das Widget nicht — aber die Anmeldung.
+
+### Der Sync war zu langsam — zwei Ursachen
+
+Beide betrafen ausgerechnet das Panel, also die Stelle, an der Verzögerung am
+meisten auffällt.
+
+**Realtime hing an der geöffneten Liste.** `subscribeToList(listId)` wurde nur
+von `ListPage` benutzt. Startseite, Agenda und das Panel abonnierten gar
+nichts — Fremdänderungen kamen dort erst beim nächsten Refetch an, also nach
+`staleTime` (30 s) plus Fensterfokus. Das Panel hat überhaupt keine geöffnete
+Liste, konnte also nie etwas abonnieren. Jetzt: `subscribeToAll()`, ein Abo je
+Fenster, ohne Filter. Was RLS nicht durchlässt, schickt der Server ohnehin
+nicht.
+
+**Optimistische Updates fassten nur den halben Cache an.** Alle Mutationen
+schrieben in `qk.tasks(listId)`. Das Panel liest aber `qk.allTasks` — ein
+Haken dort sprang deshalb erst nach dem Roundtrip um, und im lokalen Modus
+sah es aus, als hinge die App. Jetzt schreiben Anlegen, Ändern und Löschen in
+beide Caches (`patchTaskCaches` in `data/hooks.ts`).
+
+Dabei ist noch ein echter Fehler mit herausgefallen: Eine im Panel angelegte
+Aufgabe berechnete ihre Position (Fractional Index) gegen eine leere
+Geschwisterliste, weil `tasks(listId)` dort nie geladen ist. Alle bekamen
+damit denselben Schlüssel. `knownSiblings()` greift jetzt auf `allTasks`
+zurück.
 
 ### Die Capabilities sind dafür aufgeteilt worden
 
