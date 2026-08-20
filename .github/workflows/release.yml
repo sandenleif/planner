@@ -94,13 +94,7 @@ jobs:
 
           # Notarisierung: nur gesetzt, wenn die Secrets hinterlegt sind.
           # Ohne sie entsteht eine unsignierte App - lauffähig, aber Gatekeeper
-          # verlangt beim ersten Start Rechtsklick → Öffnen.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # verlangt beim ersten Start Rechtsklick → Öffnen
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__-test' }}
           releaseName: 'Planner __VERSION__'
