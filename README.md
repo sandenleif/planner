@@ -203,7 +203,7 @@ zwischen "funktioniert" und "zwei Leute überschreiben sich gegenseitig".
 **Löschen ist Soft-Delete.** Das ist nicht nur Sync-Hygiene, sondern auch die
 Grundlage für "Rückgängig": zurückholen heißt `deleted_at` leeren.
 
-## Desktop bauen
+## Desktop
 
 Braucht Rust (<https://rustup.rs>), unter Windows zusätzlich die
 Visual-Studio-Build-Tools, unter macOS die Xcode Command Line Tools.
@@ -212,6 +212,73 @@ Visual-Studio-Build-Tools, unter macOS die Xcode Command Line Tools.
 npm run desktop:dev     # Entwicklung mit Hot Reload
 npm run desktop:build   # Installer in src-tauri/target/release/bundle/
 ```
+
+### Das Menüleisten-Panel
+
+Ein Klick auf das Symbol in der Menüleiste (macOS) bzw. im Infobereich
+(Windows) klappt ein Panel auf: was heute fällig ist, ein Feld zum schnellen
+Notieren, und die Listen als Kacheln mit der Zahl offener Aufgaben.
+`Strg+Umschalt+Leertaste` öffnet es von überall.
+
+Das Panel ist ein eigenes Fenster (`panel`) auf derselben React-App, Route
+`#/panel`. Es bekommt bewusst nicht die Shell — keine Seitenleiste, keine
+Navigation. Was man dort tut, dauert Sekunden; alles andere führt über einen
+Knopf ins Hauptfenster.
+
+Rechtsklick aufs Symbol öffnet weiterhin das Menü mit „Hauptfenster öffnen"
+und „Beenden". Das Hauptfenster zu schließen beendet die App nicht — sie lebt
+in der Menüleiste weiter.
+
+### Automatische Updates
+
+Die Desktop-App prüft beim Start (und alle sechs Stunden) bei GitHub Releases,
+ob es eine neuere Version gibt, und bietet sie als Meldung an. Geladen und
+eingespielt wird erst auf Klick, neu gestartet ebenfalls.
+
+Die Pakete sind signiert. Der öffentliche Schlüssel steht in
+`tauri.conf.json`, der private gehört als GitHub-Secret hinterlegt und **nie
+ins Repository** (`.tauri/` ist ignoriert). Deshalb muss der Auslieferungsweg
+nicht vertrauenswürdig sein: wer das Release austauscht, hat trotzdem nicht
+den Schlüssel.
+
+**Android bekommt keine automatischen Updates.** Ein In-App-Updater ist dort
+systemseitig nicht vorgesehen — Aktualisierungen laufen über den Play Store
+oder ein manuell installiertes APK. Im Web ist ein Neuladen die
+Aktualisierung.
+
+#### Release bauen
+
+`.github/workflows/release.yml` baut auf einen Versions-Tag hin für macOS
+(Apple Silicon und Intel), Windows und Linux und legt daraus einen
+Release-Entwurf an — inklusive `latest.json`, das der Updater liest.
+
+```bash
+npm version 0.2.0 && git push --follow-tags
+```
+
+macOS-Apps lassen sich nur auf macOS bauen; der Workflow ist deshalb nicht
+Bequemlichkeit, sondern die Voraussetzung dafür, ohne eigenen Mac eine
+Mac-App auszuliefern.
+
+Nötige GitHub-Secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Wofür |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | Inhalt von `.tauri/planner.key` — ohne das kein gültiges Update |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | leer lassen, wenn der Schlüssel keins hat |
+| `VITE_SUPABASE_URL` | sonst laufen die Apps im lokalen Modus |
+| `VITE_SUPABASE_ANON_KEY` | dito |
+| `VITE_PUBLIC_APP_URL` | Basis für Einladungslinks |
+
+Optional für signierte, notarisierte macOS-Builds: `APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`,
+`APPLE_PASSWORD`, `APPLE_TEAM_ID`. Ohne sie entsteht eine lauffähige, aber
+unsignierte App — Gatekeeper verlangt dann beim ersten Start Rechtsklick →
+Öffnen. Für den Eigengebrauch tragbar, zum Weitergeben nicht.
+
+Der Release bleibt zunächst ein **Entwurf**. Erst wenn alle Plattformen
+fertig sind und du ihn veröffentlichst, sieht der Updater ihn — sonst holt
+er sich ein halbes Release.
 
 ## Android bauen
 

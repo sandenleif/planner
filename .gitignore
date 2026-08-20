@@ -33,3 +33,7 @@ Thumbs.db
 
 # Build-Zwischenstände
 *.tsbuildinfo
+
+# Tauri-Signaturschluessel: privat, gehoert NIE ins Repo.
+# Der oeffentliche Teil steht in src-tauri/tauri.conf.json.
+.tauri/

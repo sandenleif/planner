@@ -22,6 +22,19 @@
         "fullscreen": false,
         "center": true,
         "titleBarStyle": "Visible"
+      },
+      {
+        "label": "panel",
+        "url": "index.html#/panel",
+        "title": "Planner",
+        "width": 380,
+        "height": 520,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": true
       }
     ],
     "security": {
@@ -83,6 +96,15 @@
         "schemes": [
           "planner"
         ]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEyQkNCQjRDOUNFNTEzMzYKUldRMkUrV2NUTHU4b3RFVmlsNGRXUHdyOTZ1b3d0M0JIbDVPekxrMWttNWFuTVN6a2dCdUtGaE8K",
+      "endpoints": [
+        "https://github.com/sandenleif/planner/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

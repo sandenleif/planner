@@ -12,8 +12,10 @@ import { AgendaPage } from '@/pages/AgendaPage'
 import { HomePage } from '@/pages/HomePage'
 import { InvitePage } from '@/pages/InvitePage'
 import { ListPage } from '@/pages/ListPage'
+import { PanelPage } from '@/pages/PanelPage'
 import { useTheme } from '@/app/theme'
 import { hasModKey, modKeyLabel } from '@/lib/platform'
+import { startUpdateChecks } from '@/lib/updater'
 import { Toaster } from '@/ui/Toaster'
 
 export function App() {
@@ -30,6 +32,19 @@ export function App() {
         <CheckCircle2 size={28} className="animate-pulse text-accent-600" />
       </div>
     )
+  }
+
+  // Das Menueleisten-Panel laeuft in einem eigenen Fenster und bekommt
+  // bewusst NICHT die Shell: keine Seitenleiste, kein Kopfbalken, keine
+  // Navigation. Ein Panel, aus dem man herausnavigiert, ist ein Fenster
+  // mit falschem Rahmen.
+  //
+  // Die Pruefung steht VOR dem Anmelde-Gate: sonst landete das vollstaendige
+  // Anmeldeformular in einem 380 Pixel breiten Popover ohne Schliessknopf.
+  // Das Panel zeigt stattdessen einen kurzen Hinweis und fuehrt ins
+  // Hauptfenster.
+  if (location.pathname === '/panel') {
+    return <PanelPage />
   }
 
   // Einladungslinks brauchen ihre eigene Seite, auch ohne Anmeldung -
@@ -61,6 +76,10 @@ function Shell() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+
+  // Bewusst hier und nicht im Panel: sonst pruefen zwei Fenster parallel und
+  // der Nutzer bekommt dieselbe Meldung doppelt.
+  useEffect(() => startUpdateChecks(), [])
 
   return (
     <div className="flex h-full">
