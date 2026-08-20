@@ -500,19 +500,15 @@ export class SupabaseRepository implements Repository {
 
   // -------------------------------------------------------------- Live-Sync
 
-  subscribeToList(listId: string, onChange: () => void): () => void {
+  subscribeToAll(onChange: () => void): () => void {
+    // Kein filter: Ein Abo je Liste bedeutete, beim Wechsel der Liste jedes Mal
+    // ab- und neu anzumelden - und im Panel, das gar keine offene Liste hat,
+    // ueberhaupt keins. Was der Nutzer nicht sehen darf, schickt der Server
+    // ohnehin nicht: Postgres Changes wertet dieselben RLS-Policies aus.
     const channel = this.sb
-      .channel(`list:${listId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `list_id=eq.${listId}` },
-        onChange,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'lists', filter: `id=eq.${listId}` },
-        onChange,
-      )
+      .channel('planner:all')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lists' }, onChange)
       .subscribe()
 
     return () => {

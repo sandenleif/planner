@@ -3,13 +3,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, Palette, Share2, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
-import {
-  useDeleteList,
-  useListRealtime,
-  useLists,
-  useTasks,
-  useUpdateList,
-} from '@/data/hooks'
+import { useDeleteList, useLists, useTasks, useUpdateList } from '@/data/hooks'
 import { useRepository } from '@/data/RepositoryProvider'
 import { LIST_COLORS, listColor } from '@/features/lists/listColors'
 import { ShareDialog } from '@/features/share/ShareDialog'
@@ -31,9 +25,6 @@ export function ListPage() {
   const [syncedName, setSyncedName] = useState(list?.name ?? '')
   const [sharing, setSharing] = useState(false)
   const [pickingColor, setPickingColor] = useState(false)
-
-  // Fremdaenderungen an dieser Liste live nachziehen.
-  useListRealtime(list ? listId : null)
 
   // Entwurf nachziehen, wenn sich der Name auf dem Server geaendert hat.
   //

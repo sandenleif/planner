@@ -51,6 +51,65 @@ function invalidateDerived(qc: QueryClient) {
   void qc.invalidateQueries({ queryKey: ['due'] })
 }
 
+interface TaskSnapshot {
+  list: Task[] | undefined
+  all: Task[] | undefined
+}
+
+/**
+ * Wendet eine optimistische Aenderung auf BEIDE Aufgaben-Caches an: die
+ * Abfrage der einen Liste und die listenuebergreifende.
+ *
+ * Der Grund ist das Menueleisten-Panel. Es liest `allTasks` - eine geoeffnete
+ * Liste hat es nicht. Fasste eine Mutation wie bisher nur `tasks(listId)` an,
+ * spraenge der Haken dort erst nach dem Roundtrip um. Ausgerechnet an der
+ * Stelle, die man fuer genau diesen einen Handgriff aufklappt, saehe die App
+ * damit am langsamsten aus.
+ *
+ * Ein Cache, den es noch nicht gibt, bleibt leer: `undefined` heisst "nie
+ * geladen". Ihn mit einer einzelnen Zeile zu fuellen ergaebe eine Liste, die
+ * so nie existiert hat.
+ *
+ * Rueckgabe ist der Zustand von vorher - fuer den Rollback im Fehlerfall.
+ */
+function patchTaskCaches(
+  qc: QueryClient,
+  listId: string,
+  update: (tasks: Task[]) => Task[],
+): TaskSnapshot {
+  const previous: TaskSnapshot = {
+    list: qc.getQueryData<Task[]>(qk.tasks(listId)),
+    all: qc.getQueryData<Task[]>(qk.allTasks),
+  }
+
+  qc.setQueryData<Task[]>(qk.tasks(listId), (old) => (old ? update(old) : old))
+  qc.setQueryData<Task[]>(qk.allTasks, (old) => (old ? update(old) : old))
+
+  return previous
+}
+
+function restoreTaskCaches(qc: QueryClient, listId: string, previous: TaskSnapshot) {
+  if (previous.list) qc.setQueryData(qk.tasks(listId), previous.list)
+  if (previous.all) qc.setQueryData(qk.allTasks, previous.all)
+}
+
+/**
+ * Die bereits bekannten Geschwister einer Liste - egal, welche Abfrage sie
+ * gerade im Cache hat.
+ *
+ * Wird fuer die Position einer neuen Aufgabe gebraucht (Fractional Index).
+ * Im Panel ist `tasks(listId)` nie geladen; ohne den Rueckgriff auf
+ * `allTasks` rechnete jede dort angelegte Aufgabe ihre Position gegen eine
+ * leere Liste - und alle bekaemen dieselbe.
+ */
+function knownSiblings(qc: QueryClient, listId: string): Task[] {
+  const fromList = qc.getQueryData<Task[]>(qk.tasks(listId))
+  if (fromList) return fromList
+
+  const fromAll = qc.getQueryData<Task[]>(qk.allTasks) ?? []
+  return fromAll.filter((task) => task.listId === listId)
+}
+
 // ---------------------------------------------------------------------- Listen
 
 export function useLists() {
@@ -147,19 +206,23 @@ export function useCreateTask(listId: string) {
   return useMutation({
     mutationFn: (input: Omit<NewTask, 'listId'>) => repo.createTask({ ...input, listId }),
     onMutate: async (input) => {
-      const key = qk.tasks(listId)
-      await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Task[]>(key)
+      await qc.cancelQueries({ queryKey: qk.tasks(listId) })
+      await qc.cancelQueries({ queryKey: qk.allTasks })
 
       // Platzhalter mit eigener ID. Wird beim Invalidieren durch die echte
       // Zeile ersetzt; bis dahin ist die Aufgabe sofort sichtbar.
-      const optimistic = draftTask(listId, input, repo.currentUserId(), previous ?? [])
-      qc.setQueryData<Task[]>(key, (old) => [...(old ?? []), optimistic])
+      const optimistic = draftTask(
+        listId,
+        input,
+        repo.currentUserId(),
+        knownSiblings(qc, listId),
+      )
+      const previous = patchTaskCaches(qc, listId, (tasks) => [...tasks, optimistic])
 
       return { previous }
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(qk.tasks(listId), ctx.previous)
+      if (ctx?.previous) restoreTaskCaches(qc, listId, ctx.previous)
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.tasks(listId) })
@@ -176,12 +239,11 @@ export function useUpdateTask(listId: string) {
     mutationFn: ({ id, patch }: { id: string; patch: TaskPatch }) =>
       repo.updateTask(id, patch),
     onMutate: async ({ id, patch }) => {
-      const key = qk.tasks(listId)
-      await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Task[]>(key)
+      await qc.cancelQueries({ queryKey: qk.tasks(listId) })
+      await qc.cancelQueries({ queryKey: qk.allTasks })
 
-      qc.setQueryData<Task[]>(key, (old) =>
-        old?.map((t) =>
+      const previous = patchTaskCaches(qc, listId, (tasks) =>
+        tasks.map((t) =>
           t.id === id
             ? {
                 ...t,
@@ -200,7 +262,7 @@ export function useUpdateTask(listId: string) {
       return { previous }
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(qk.tasks(listId), ctx.previous)
+      if (ctx?.previous) restoreTaskCaches(qc, listId, ctx.previous)
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.tasks(listId) })
@@ -229,19 +291,20 @@ export function useDeleteTask(listId: string) {
     },
 
     onMutate: async (id) => {
-      const key = qk.tasks(listId)
-      await qc.cancelQueries({ queryKey: key })
-      const previous = qc.getQueryData<Task[]>(key)
+      await qc.cancelQueries({ queryKey: qk.tasks(listId) })
+      await qc.cancelQueries({ queryKey: qk.allTasks })
 
       // Unterpunkte verschwinden mit - sonst blitzen sie als Waisen auf,
       // bis der Server antwortet.
-      const doomed = collectSubtree(previous ?? [], id)
-      qc.setQueryData<Task[]>(key, (old) => old?.filter((t) => !doomed.has(t.id)))
+      const doomed = collectSubtree(knownSiblings(qc, listId), id)
+      const previous = patchTaskCaches(qc, listId, (tasks) =>
+        tasks.filter((t) => !doomed.has(t.id)),
+      )
 
       return { previous }
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(qk.tasks(listId), ctx.previous)
+      if (ctx?.previous) restoreTaskCaches(qc, listId, ctx.previous)
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: qk.tasks(listId) })
@@ -363,23 +426,37 @@ export function useAcceptInvite() {
 // ------------------------------------------------------------------ Live-Sync
 
 /**
- * Abonniert Fremdaenderungen an der aktiven Liste und invalidiert dann die
- * betroffenen Queries. Bewusst grob: neu laden ist bei diesen Datenmengen
+ * Abonniert Fremdaenderungen an allen sichtbaren Listen und invalidiert dann
+ * die betroffenen Queries. Bewusst grob: neu laden ist bei diesen Datenmengen
  * billiger als das Zusammenfuehren einzelner Events - und deutlich weniger
  * fehleranfaellig.
+ *
+ * Frueher hing das Abo an der geoeffneten Liste. Damit bekam nur die
+ * Listenansicht Fremdaenderungen mit: Startseite, Agenda und das
+ * Menueleisten-Panel warteten auf den naechsten Refetch, also bis zu
+ * `staleTime` plus Fensterfokus. Genau dort faellt es aber auf - das Panel
+ * klappt man auf, um in zwei Sekunden zu sehen, was ansteht.
+ *
+ * Gehoert je Fenster genau einmal in den Baum. Haupt- und Panel-Fenster sind
+ * getrennte WebViews mit getrennten Caches; jedes braucht sein eigenes.
  */
-export function useListRealtime(listId: string | null) {
+export function useGlobalRealtime() {
   const repo = useRepository()
   const qc = useQueryClient()
 
-  useEffect(() => {
-    if (!listId) return
-    return repo.subscribeToList(listId, () => {
-      void qc.invalidateQueries({ queryKey: qk.tasks(listId) })
-      void qc.invalidateQueries({ queryKey: qk.lists })
-      invalidateDerived(qc)
-    })
-  }, [repo, qc, listId])
+  useEffect(
+    () =>
+      repo.subscribeToAll(() => {
+        // Praefix statt einzelnem Schluessel: welche Liste sich geaendert hat,
+        // steht im Ereignis, aber danach zu unterscheiden hiesse, die Zeile
+        // auszuwerten - und damit genau das Zusammenfuehren zu tun, das dieser
+        // Ansatz vermeiden will.
+        void qc.invalidateQueries({ queryKey: ['tasks'] })
+        void qc.invalidateQueries({ queryKey: qk.lists })
+        invalidateDerived(qc)
+      }),
+    [repo, qc],
+  )
 }
 
 // ------------------------------------------------------------------- Helfer

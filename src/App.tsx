@@ -4,6 +4,7 @@ import { CheckCircle2, Menu, Search, Settings, WifiOff } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/auth/AuthProvider'
 import { SignInScreen } from '@/auth/SignInScreen'
+import { useGlobalRealtime } from '@/data/hooks'
 import { useRepository } from '@/data/RepositoryProvider'
 import { Sidebar } from '@/features/lists/Sidebar'
 import { CommandPalette } from '@/features/search/CommandPalette'
@@ -85,6 +86,10 @@ function Shell() {
   // Aus demselben Grund hier: Tray-Symbol und Homescreen-Widget haben genau
   // einen Absender.
   useWidgetSync()
+
+  // Fremdaenderungen live nachziehen - fuer alle Listen, nicht nur die
+  // geoeffnete. Startseite und Agenda zeigen listenuebergreifend.
+  useGlobalRealtime()
 
   return (
     <div className="flex h-full">

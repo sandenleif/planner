@@ -92,9 +92,17 @@ export interface Repository {
   // -------------------------------------------------------------- Live-Sync
 
   /**
-   * Meldet Fremdaenderungen an dieser Liste. Rueckgabe ist die Abmeldefunktion.
-   * Implementierungen ohne Live-Sync geben eine no-op zurueck - die UI muss
-   * das nicht wissen.
+   * Meldet Fremdaenderungen an ALLEN sichtbaren Listen. Rueckgabe ist die
+   * Abmeldefunktion. Implementierungen ohne Live-Sync geben eine no-op
+   * zurueck - die UI muss das nicht wissen.
+   *
+   * Bewusst nicht "nur die geoeffnete Liste": Das Menueleisten-Panel zeigt
+   * listenuebergreifend, was heute ansteht, und hat gar keine geoeffnete
+   * Liste. Ein Abo je Liste haette dort nichts zu abonnieren - Aenderungen
+   * anderer Geraete kaemen erst beim naechsten Refetch an.
+   *
+   * Was RLS nicht durchlaesst, kommt hier auch nicht an: Postgres Changes
+   * filtert serverseitig nach denselben Policies.
    */
-  subscribeToList(listId: string, onChange: () => void): () => void
+  subscribeToAll(onChange: () => void): () => void
 }

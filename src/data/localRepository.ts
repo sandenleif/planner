@@ -335,7 +335,7 @@ export class LocalRepository implements Repository {
 
   // -------------------------------------------------------------- Live-Sync
 
-  subscribeToList(): () => void {
+  subscribeToAll(): () => void {
     // Ein Geraet, eine Quelle - es gibt niemanden, der von aussen aendert.
     return () => {}
   }
