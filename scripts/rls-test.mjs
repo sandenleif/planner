@@ -32,6 +32,7 @@ const SQL_FILES = [
   ['Row Level Security', 'supabase/migrations/0002_rls.sql'],
   ['Realtime', 'supabase/migrations/0003_realtime.sql'],
   ['Funktionsrechte', 'supabase/migrations/0004_function_privileges.sql'],
+  ['Fix: INSERT RETURNING', 'supabase/migrations/0005_fix_list_insert_returning.sql'],
 ]
 
 function docker(args, options = {}) {

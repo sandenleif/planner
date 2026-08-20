@@ -17,6 +17,15 @@
 -- Datenbank exakt so, als kaeme die Anfrage von diesem Nutzer durch PostgREST.
 -- Deshalb prueft dieser Test die echten Policies - nicht eine Nachbildung.
 --
+-- WICHTIG - warum ueberall RETURNING steht:
+-- Der Client ruft `.insert(...).select()` auf, PostgREST macht daraus ein
+-- INSERT ... RETURNING. Bei aktivem RLS verlangt Postgres dafuer ZUSAETZLICH,
+-- dass die SELECT-Policy die neue Zeile durchlaesst. Ein nacktes INSERT prueft
+-- diesen Weg nicht - und genau daran ist eine erste Fassung dieses Tests
+-- vorbeigelaufen, waehrend das Anlegen einer Liste in der App scheiterte
+-- (siehe 0005_fix_list_insert_returning.sql). Ein Test muss den Zugriffsweg
+-- nachstellen, den die Anwendung tatsaechlich nimmt, nicht einen bequemeren.
+--
 -- Bewusst ohne psql-Variablen (\set) und ohne Funktion fuers Rollenwechseln:
 -- der SQL-Editor ist kein psql, und SET LOCAL ROLE innerhalb einer Funktion
 -- verhaelt sich je nach Funktionsdefinition anders. Alles steht deshalb als
@@ -84,18 +93,34 @@ select set_config('request.jwt.claims',
   true);
 set local role authenticated;
 
-insert into public.lists (id, owner_id, name, color)
-values ('33333333-3333-4333-8333-333333333333',
-        '11111111-1111-4111-8111-111111111111', 'Alices Liste', '#2E6F50');
-
-insert into public.tasks (list_id, title, created_by)
-values ('33333333-3333-4333-8333-333333333333', 'Alices geheime Aufgabe',
-        '11111111-1111-4111-8111-111111111111');
-
 do $$
+declare
+  neu uuid;
 begin
   raise notice '';
   raise notice '=== Akt 1: Alice legt eine Liste an ===';
+
+  -- Der kritische Weg: INSERT ... RETURNING, genau wie PostgREST es ausfuehrt.
+  insert into public.lists (id, owner_id, name, color)
+  values ('33333333-3333-4333-8333-333333333333',
+          '11111111-1111-4111-8111-111111111111', 'Alices Liste', '#2E6F50')
+  returning id into neu;
+
+  perform pg_temp.assert(
+    neu = '33333333-3333-4333-8333-333333333333',
+    'Liste anlegen mit RETURNING (so macht es die App)'
+  );
+
+  insert into public.tasks (list_id, title, created_by)
+  values ('33333333-3333-4333-8333-333333333333', 'Alices geheime Aufgabe',
+          '11111111-1111-4111-8111-111111111111')
+  returning id into neu;
+
+  perform pg_temp.assert(neu is not null, 'Aufgabe anlegen mit RETURNING');
+end $$;
+
+do $$
+begin
   perform pg_temp.assert(
     (select count(*) from public.list_members
       where list_id = '33333333-3333-4333-8333-333333333333'
@@ -188,9 +213,17 @@ select set_config('request.jwt.claims',
   true);
 set local role authenticated;
 
-insert into public.list_invites (list_id, email, role, token, invited_by)
-values ('33333333-3333-4333-8333-333333333333', 'bob@test.local', 'editor',
-        'test-token-abc', '11111111-1111-4111-8111-111111111111');
+do $$
+declare
+  neu uuid;
+begin
+  insert into public.list_invites (list_id, email, role, token, invited_by)
+  values ('33333333-3333-4333-8333-333333333333', 'bob@test.local', 'editor',
+          'test-token-abc', '11111111-1111-4111-8111-111111111111')
+  returning id into neu;
+
+  perform pg_temp.assert(neu is not null, 'Einladung anlegen mit RETURNING');
+end $$;
 
 reset role;
 select set_config('request.jwt.claims',
@@ -251,9 +284,17 @@ end $$;
 
 -- ================================ Akt 4: Editor darf schreiben, nicht loeschen
 
-insert into public.tasks (list_id, title, created_by)
-values ('33333333-3333-4333-8333-333333333333', 'Bobs Beitrag',
-        '22222222-2222-4222-8222-222222222222');
+do $$
+declare
+  neu uuid;
+begin
+  insert into public.tasks (list_id, title, created_by)
+  values ('33333333-3333-4333-8333-333333333333', 'Bobs Beitrag',
+          '22222222-2222-4222-8222-222222222222')
+  returning id into neu;
+
+  perform pg_temp.assert(neu is not null, 'Editor legt Aufgabe an mit RETURNING');
+end $$;
 
 -- Diese Pruefung steht bewusst VOR den Loeschversuchen: greift die
 -- Loesch-Policy naemlich faelschlich, raeumt der Cascade die Aufgaben gleich
