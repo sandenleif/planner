@@ -81,6 +81,29 @@ as $fn$
   );
 $fn$;
 
+-- --------------------------------------------------------------- Privilegien
+
+-- Supabase vergibt fuer neue Tabellen normalerweise automatisch Rechte an
+-- anon/authenticated (per ALTER DEFAULT PRIVILEGES). Das hier explizit
+-- hinzuschreiben kostet nichts und macht das Schema unabhaengig davon -
+-- etwa beim Einspielen in ein selbst gehostetes Postgres.
+--
+-- Wichtig: GRANT allein oeffnet nichts. Was eine Zeile sichtbar macht,
+-- entscheiden ausschliesslich die Policies weiter unten. Ohne passende
+-- Policy liefert ein SELECT trotz GRANT null Zeilen.
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on
+  public.profiles,
+  public.lists,
+  public.list_members,
+  public.tasks,
+  public.list_invites
+to authenticated;
+
+-- anon (nicht angemeldet) bekommt bewusst gar nichts: es gibt in dieser App
+-- keine oeffentlich lesbaren Daten.
+
 -- ------------------------------------------------------------ RLS einschalten
 
 alter table public.profiles       enable row level security;

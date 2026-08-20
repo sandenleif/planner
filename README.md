@@ -70,6 +70,36 @@ Meldung heraus zurückholen, samt Unterpunkten.
 
 Wer die Supabase CLI nutzt: `supabase db push` spielt denselben Ordner ein.
 
+### Nachweisen, dass die Berechtigungen halten
+
+„RLS ist aktiviert" ist keine Aussage über Sicherheit — eine Policy kann
+existieren und trotzdem zu weit sein. `supabase/tests/rls_test.sql` beantwortet
+die Frage stattdessen praktisch: Es legt zwei Testnutzer an, lässt sie
+gegeneinander antreten und prüft 28 Regeln — sieht Bob Alices Aufgaben? Kann
+er in ihre Liste schreiben? Darf ein Editor die Liste löschen? Lässt sich ein
+Einladungstoken zweimal einlösen?
+
+**Lokal, ohne Supabase** (braucht nur Docker):
+
+```bash
+npm run db:test
+```
+
+Startet ein frisches Postgres im Container, baut die nötigen Teile der
+Supabase-Umgebung nach (`supabase/tests/local_bootstrap.sql` — Rollen
+`anon`/`authenticated`, Originaldefinitionen von `auth.uid()` und `auth.jwt()`),
+spielt die Migrationen ein und fährt den Test. Exit-Code 0 = alles grün, 1 =
+eine Regel ist verletzt.
+
+**Gegen das echte Projekt**: `supabase/tests/rls_test.sql` komplett in den
+SQL-Editor einfügen. Der Test läuft in einer Transaktion und endet mit
+`ROLLBACK` — er hinterlässt weder Testdaten noch Testnutzer.
+
+Der Test hat Zähne: mit absichtlich aufgeweichten Policies (`using (true)` auf
+`tasks_select`, Editoren dürfen löschen, die Rekursionsfalle auf
+`list_members` wieder eingebaut) schlägt er jeweils fehl und benennt die
+verletzte Regel.
+
 ### Google-Anmeldung
 
 Optional, im Dashboard unter Authentication → Providers → Google. Im Browser
@@ -147,10 +177,10 @@ braucht es keine Server-Rewrites.
 
 ## Nächste Schritte
 
-1. **Login, Nutzertrennung, Security härten** — Anmeldung und RLS stehen; offen
-   sind Passwort-zurücksetzen, E-Mail-Bestätigung, Rate-Limiting, ein Test, der
-   die Policies nachweislich prüft, und der Deep-Link-Rücksprung für OAuth in
-   Tauri.
+1. **Login und Security abrunden** — Anmeldung, Nutzertrennung und RLS stehen
+   und sind durch `npm run db:test` abgesichert. Offen sind
+   Passwort-zurücksetzen, E-Mail-Bestätigung, Rate-Limiting und der
+   Deep-Link-Rücksprung für OAuth in Tauri.
 2. **Android-Widget** — Jetpack Glance im generierten Gradle-Projekt.
    `Repository.getDueTasks()` ist genau die Abfrage, die das Widget braucht.
 3. **Echtes Offline-Schreiben** — [PowerSync](https://powersync.com) als

@@ -20,6 +20,10 @@ src-tauri/gen/android/build
 *.keystore
 keystore.properties
 
+# Claude Code: settings.json waere geteilt, settings.local.json ist
+# maschinenlokal (erteilte Berechtigungen o. ae.) und gehoert nicht ins Repo.
+.claude/settings.local.json
+
 # Editoren / OS
 .vscode/*
 !.vscode/extensions.json
