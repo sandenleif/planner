@@ -14,6 +14,7 @@ import { InvitePage } from '@/pages/InvitePage'
 import { ListPage } from '@/pages/ListPage'
 import { PanelPage } from '@/pages/PanelPage'
 import { useTheme } from '@/app/theme'
+import { useWidgetSync } from '@/app/widgetSync'
 import { hasModKey, modKeyLabel } from '@/lib/platform'
 import { startUpdateChecks } from '@/lib/updater'
 import { Toaster } from '@/ui/Toaster'
@@ -80,6 +81,10 @@ function Shell() {
   // Bewusst hier und nicht im Panel: sonst pruefen zwei Fenster parallel und
   // der Nutzer bekommt dieselbe Meldung doppelt.
   useEffect(() => startUpdateChecks(), [])
+
+  // Aus demselben Grund hier: Tray-Symbol und Homescreen-Widget haben genau
+  // einen Absender.
+  useWidgetSync()
 
   return (
     <div className="flex h-full">

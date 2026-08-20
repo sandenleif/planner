@@ -1,15 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ArrowUpRight, Check, Plus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowUpRight, Check, Pin, PinOff, Plus, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/auth/AuthProvider'
-import { useAllTasks, useCreateTask, useLists, useToggleTaskDone } from '@/data/hooks'
+import { qk, useAllTasks, useCreateTask, useLists, useToggleTaskDone } from '@/data/hooks'
 import type { List, Task } from '@/data/types'
 import { formatDueDate, isOverdue, todayIso } from '@/lib/date'
 import { sortByPosition } from '@/lib/ordering'
 import { listColor } from '@/features/lists/listColors'
 import { parseQuickAdd } from '@/lib/parseQuickAdd'
-import { openMainWindow } from '@/lib/desktop'
+import {
+  hidePanel,
+  isPanelPinned,
+  onPanelShown,
+  openMainWindow,
+  setPanelPinned,
+  watchPanelPosition,
+} from '@/lib/desktop'
 
 /**
  * Die Menüleisten-Ansicht: das, was aus dem Tray-Symbol aufklappt.
@@ -22,12 +30,19 @@ import { openMainWindow } from '@/lib/desktop'
  *
  * Deshalb steht hier auch keine Navigation: ein Panel, aus dem man
  * herausnavigiert, ist ein Fenster mit falschem Rahmen.
+ *
+ * Angeheftet (Stecknadel oben rechts) bleibt dasselbe Fenster stehen, statt
+ * beim Klick daneben zu verschwinden. Das ist der Widget-Modus: dieselbe
+ * Ansicht, nur dauerhaft auf dem Schreibtisch statt kurz aufgeklappt. Bewusst
+ * kein zweites Fenster dafür — es wäre dieselbe Ansicht mit einem zweiten Satz
+ * Fehlerquellen.
  */
 export function PanelPage() {
   const auth = useAuth()
   const { data: lists = [] } = useLists()
   const { data: tasks = [] } = useAllTasks()
   const [draft, setDraft] = useState('')
+  const { pinned, togglePinned } = usePanelWindow()
 
   const today = todayIso()
   const sortedLists = useMemo(() => sortByPosition(lists), [lists])
@@ -98,14 +113,43 @@ export function PanelPage() {
           </h1>
         </div>
 
-        <button
-          onClick={() => void openMainWindow()}
-          className="btn-ghost shrink-0 px-2"
-          aria-label="Im Hauptfenster öffnen"
-          title="Im Hauptfenster öffnen"
-        >
-          <ArrowUpRight size={16} />
-        </button>
+        <div className="flex shrink-0 items-center">
+          <button
+            onClick={togglePinned}
+            className={clsx('btn-ghost px-2', pinned && 'text-accent-600')}
+            aria-label={pinned ? 'Panel lösen' : 'Panel anheften'}
+            aria-pressed={pinned}
+            title={
+              pinned
+                ? 'Angeheftet — bleibt offen. Klicken zum Lösen.'
+                : 'Anheften — bleibt offen, statt beim Klick daneben zu schließen'
+            }
+          >
+            {pinned ? <Pin size={16} /> : <PinOff size={16} />}
+          </button>
+
+          <button
+            onClick={() => void openMainWindow()}
+            className="btn-ghost px-2"
+            aria-label="Im Hauptfenster öffnen"
+            title="Im Hauptfenster öffnen"
+          >
+            <ArrowUpRight size={16} />
+          </button>
+
+          {/* Nur angeheftet: unangeheftet schließt schon der Klick daneben,
+              und ein Knopf, der dasselbe tut, ist nur ein Knopf mehr. */}
+          {pinned && (
+            <button
+              onClick={() => void hidePanel()}
+              className="btn-ghost px-2"
+              aria-label="Panel schließen"
+              title="Schließen — das Tray-Symbol holt es zurück"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </header>
 
       <div className="shrink-0 px-4 pb-2">
@@ -167,6 +211,64 @@ export function PanelPage() {
       </div>
     </div>
   )
+}
+
+/**
+ * Alles, was das Panel als *Fenster* betrifft: anheften, Position merken,
+ * beim Aufklappen nachladen.
+ *
+ * Der Nachladeteil ist der unscheinbarste und der wichtigste. Das Panel-Fenster
+ * wird nie zerstört, sondern nur versteckt — React montiert also nicht neu, und
+ * `refetchOnWindowFocus` greift nicht zuverlässig, weil ein verstecktes Fenster
+ * den Fokus nie richtig verliert. Ohne das Signal aus Rust zeigte das Panel
+ * beim nächsten Aufklappen den Stand von vorhin.
+ */
+function usePanelWindow() {
+  const queryClient = useQueryClient()
+  const [pinned, setPinned] = useState(isPanelPinned)
+
+  // Beim Start meldet das Panel den gemerkten Zustand einmal nach Rust. Rust
+  // startet immer ungeheftet - dort überlebt nichts einen Neustart.
+  useEffect(() => {
+    if (isPanelPinned()) void setPanelPinned(true)
+  }, [])
+
+  useEffect(() => {
+    let dispose: (() => void) | undefined
+    let cancelled = false
+
+    // Die Anmeldung ist asynchron; wird die Komponente vorher abgeräumt, muss
+    // die zurückkommende Abmeldefunktion trotzdem laufen.
+    void watchPanelPosition().then((fn) => (cancelled ? fn() : (dispose = fn)))
+
+    return () => {
+      cancelled = true
+      dispose?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    let dispose: (() => void) | undefined
+    let cancelled = false
+
+    void onPanelShown(() => {
+      void queryClient.invalidateQueries({ queryKey: qk.lists })
+      void queryClient.invalidateQueries({ queryKey: qk.allTasks })
+    }).then((fn) => (cancelled ? fn() : (dispose = fn)))
+
+    return () => {
+      cancelled = true
+      dispose?.()
+    }
+  }, [queryClient])
+
+  const togglePinned = () => {
+    const next = !pinned
+    setPinned(next)
+    void setPanelPinned(next)
+  }
+
+  return { pinned, togglePinned }
 }
 
 /**

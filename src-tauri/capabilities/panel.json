@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "panel",
+  "description": "Das angeheftete Panel darf sich seine Position merken. Eigene Datei statt eines Eintrags in default.json, damit das Recht am Fenster haengt, das es braucht - das Hauptfenster soll sich nicht selbst verschieben koennen.",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["panel"],
+  "permissions": ["core:window:allow-set-position"]
+}

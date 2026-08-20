@@ -5,17 +5,24 @@
 //!
 //!   * ein Panel in der Menüleiste (macOS) bzw. im Infobereich (Windows),
 //!     das aus dem Tray-Symbol aufklappt,
+//!   * eine Anzahl am Tray-Symbol, die zeigt, was heute ansteht,
+//!   * ein angehefteter Panel-Modus: das Panel bleibt als Widget stehen,
+//!     statt beim Klick daneben zu verschwinden,
 //!   * Schließen versteckt das Hauptfenster, statt die App zu beenden,
 //!   * ein globales Tastenkürzel,
 //!   * der Rückweg aus der Google-Anmeldung über `planner://`,
 //!   * automatische Aktualisierungen.
 //!
 //! Auf Android fällt all das weg — dort ist die App eine normale Activity,
-//! und Aktualisierungen laufen über den Store.
+//! Aktualisierungen laufen über den Store, und die glanceable Ansicht ist
+//! das Homescreen-Widget (siehe `plugins/planner-widget`).
+
+#[cfg(desktop)]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(desktop)]
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri::{AppHandle, Emitter, Manager};
@@ -24,8 +31,44 @@ use tauri::{AppHandle, Emitter, Manager};
 /// Muss zu `OAUTH_CALLBACK_EVENT` in src/auth/oauth.ts passen.
 const OAUTH_EVENT: &str = "oauth://callback";
 
+/// Meldet dem Panel, dass es gerade sichtbar geworden ist. Das Fenster lebt
+/// dauerhaft im Hintergrund weiter — ohne dieses Signal zeigte es beim
+/// Aufklappen den Stand von vorhin.
+/// Muss zu `PANEL_SHOWN_EVENT` in src/lib/desktop.ts passen.
+#[cfg(desktop)]
+const PANEL_SHOWN: &str = "panel://shown";
+
+/// ID des Tray-Symbols. Wird gebraucht, um es später wiederzufinden und die
+/// Anzahl daran zu schreiben.
+#[cfg(desktop)]
+const TRAY: &str = "main-tray";
+
 const MAIN: &str = "main";
 const PANEL: &str = "panel";
+
+/// Ob das Panel angeheftet ist.
+///
+/// Der Zustand gehört nach Rust, nicht ins Frontend: Über das Verstecken bei
+/// Fokusverlust entscheidet `on_window_event`, und das läuft, noch bevor eine
+/// WebView gefragt werden könnte. Ein Umweg über das Frontend wäre ein
+/// Wettlauf — das Panel wäre weg, bevor die Antwort da ist.
+///
+/// Was der Nutzer eingestellt hat, merkt sich das Frontend (localStorage) und
+/// meldet es beim Start hierher zurück. Rust hält nur den laufenden Zustand.
+#[cfg(desktop)]
+#[derive(Default)]
+struct PanelState {
+    pinned: AtomicBool,
+}
+
+#[cfg(desktop)]
+fn panel_is_pinned(app: &AppHandle) -> bool {
+    // try_state statt state: Fensterereignisse können auftreten, bevor setup()
+    // den Zustand registriert hat. Ein Panik-Abbruch beim Programmstart wäre
+    // ein hoher Preis für eine Frage, die sich mit "nein" beantworten lässt.
+    app.try_state::<PanelState>()
+        .is_some_and(|state| state.pinned.load(Ordering::Relaxed))
+}
 
 // ------------------------------------------------------------------ Fenster
 
@@ -45,15 +88,40 @@ fn hide_panel_window(app: &AppHandle) {
     }
 }
 
+/// Zeigt das Panel und meldet ihm, dass es sichtbar geworden ist.
+///
+/// `move_to_tray` steuert die Positionierung: beim Aufklappen aus dem
+/// Tray-Symbol gehört das Panel unter das Symbol, im angehefteten Modus
+/// dorthin, wo der Nutzer es hingeschoben hat.
+#[cfg(desktop)]
+fn show_panel_window(app: &AppHandle, move_to_tray: bool) {
+    use tauri_plugin_positioner::{Position, WindowExt};
+
+    let Some(panel) = app.get_webview_window(PANEL) else {
+        return;
+    };
+
+    if move_to_tray {
+        // Unter dem Symbol auf Windows, darunter hängend auf macOS - beides
+        // deckt TrayBottomCenter ab.
+        let _ = panel.move_window(Position::TrayBottomCenter);
+    }
+
+    let _ = panel.show();
+    let _ = panel.set_focus();
+    let _ = app.emit_to(PANEL, PANEL_SHOWN, ());
+}
+
 /// Klappt das Menüleisten-Panel auf oder zu.
 ///
 /// Positioniert wird über tauri-plugin-positioner, das sich die Koordinaten
 /// des Tray-Symbols aus dem Klick-Ereignis merkt. Selbst rechnen wäre je
 /// Plattform anders — und auf macOS mit mehreren Bildschirmen schnell falsch.
+///
+/// Ausgenommen ist das angeheftete Panel: wer es einmal an eine Bildschirmecke
+/// geschoben hat, erwartet es dort wieder und nicht am Tray-Symbol.
 #[cfg(desktop)]
 fn toggle_panel(app: &AppHandle) {
-    use tauri_plugin_positioner::{Position, WindowExt};
-
     let Some(panel) = app.get_webview_window(PANEL) else {
         return;
     };
@@ -63,11 +131,7 @@ fn toggle_panel(app: &AppHandle) {
         return;
     }
 
-    // Unter dem Symbol auf Windows, darunter hängend auf macOS - beides
-    // deckt TrayBottomCenter ab.
-    let _ = panel.move_window(Position::TrayBottomCenter);
-    let _ = panel.show();
-    let _ = panel.set_focus();
+    show_panel_window(app, !panel_is_pinned(app));
 }
 
 // ------------------------------------------------------------------ Befehle
@@ -117,6 +181,76 @@ fn hide_panel(app: AppHandle) {
     let _ = app;
 }
 
+/// Heftet das Panel an oder löst es wieder.
+///
+/// Angeheftet bleibt es beim Klick daneben stehen — aus dem Popover wird ein
+/// Widget, das dauerhaft auf dem Schreibtisch liegt. Deshalb wird es beim
+/// Anheften auch gleich gezeigt: Anheften ist eine Bitte, es zu sehen.
+#[tauri::command]
+fn set_panel_pinned(app: AppHandle, pinned: bool) {
+    #[cfg(desktop)]
+    {
+        if let Some(state) = app.try_state::<PanelState>() {
+            state.pinned.store(pinned, Ordering::Relaxed);
+        }
+
+        if pinned {
+            // Nicht ans Tray-Symbol rücken: die Position hat das Frontend
+            // gerade wiederhergestellt, bevor es hier hereinkam.
+            show_panel_window(&app, false);
+        }
+    }
+
+    #[cfg(not(desktop))]
+    let _ = (app, pinned);
+}
+
+/// Schreibt die Anzahl der heute offenen Aufgaben ans Tray-Symbol.
+///
+/// Der Sinn des ganzen Panels ist, kurz nachzusehen, was ansteht. Wenn schon
+/// das Symbol die Antwort trägt, entfällt auch dieser Schritt — auf macOS als
+/// Zahl neben dem Symbol, überall als Kurzinfo beim Darüberfahren.
+///
+/// Kein `Result`: dass eine Zahl am Symbol nicht ankommt, ist kein Grund, im
+/// Frontend einen Fehler zu behandeln. Es steht im Log und gut.
+#[tauri::command]
+fn set_tray_badge(app: AppHandle, count: u32) {
+    #[cfg(desktop)]
+    {
+        let Some(tray) = app.tray_by_id(TRAY) else {
+            log::warn!("Tray-Symbol nicht gefunden - Anzahl nicht gesetzt");
+            return;
+        };
+
+        // Linux kennt beides nicht (der Infobereich ist dort kein einheitliches
+        // Konzept), Windows kennt keinen Titel. Beide Aufrufe scheitern dann
+        // still - das ist in Ordnung, das Panel selbst zeigt die Zahl ohnehin.
+        #[cfg(target_os = "macos")]
+        {
+            let title = if count == 0 {
+                None
+            } else {
+                Some(count.to_string())
+            };
+            if let Err(error) = tray.set_title(title) {
+                log::warn!("Anzahl am Tray-Symbol nicht gesetzt: {error}");
+            }
+        }
+
+        let tooltip = match count {
+            0 => "Planner — nichts fällig".to_string(),
+            1 => "Planner — 1 Aufgabe heute".to_string(),
+            n => format!("Planner — {n} Aufgaben heute"),
+        };
+        if let Err(error) = tray.set_tooltip(Some(tooltip)) {
+            log::warn!("Kurzinfo am Tray-Symbol nicht gesetzt: {error}");
+        }
+    }
+
+    #[cfg(not(desktop))]
+    let _ = (app, count);
+}
+
 // ------------------------------------------------------------------ Deep-Link
 
 /// Reicht eine `planner://`-URL ans Frontend weiter und holt das Fenster nach
@@ -142,11 +276,16 @@ fn forward_deep_link(app: &AppHandle, url: &str) {
 
 #[cfg(desktop)]
 fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
+    // Auf Linux gibt es kein verlässliches Linksklick-Ereignis für Tray-Symbole:
+    // je nach Desktop-Umgebung klappt dort direkt das Menü auf. Ohne einen
+    // Eintrag fürs Panel wäre es auf diesen Systemen gar nicht erreichbar.
+    let panel = MenuItem::with_id(app, "panel", "Panel anzeigen", true, None::<&str>)?;
     let open = MenuItem::with_id(app, "open", "Hauptfenster öffnen", true, None::<&str>)?;
+    let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let menu = Menu::with_items(app, &[&panel, &open, &separator, &quit])?;
 
-    TrayIconBuilder::with_id("main-tray")
+    TrayIconBuilder::with_id(TRAY)
         .icon(
             app.default_window_icon()
                 .expect("Bundle ohne Fenstersymbol")
@@ -158,6 +297,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "panel" => show_panel_window(app, !panel_is_pinned(app)),
             "open" => {
                 hide_panel_window(app);
                 show_main_window(app);
@@ -231,8 +371,16 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![open_main_window, hide_panel])
+        .invoke_handler(tauri::generate_handler![
+            open_main_window,
+            hide_panel,
+            set_panel_pinned,
+            set_tray_badge
+        ])
         .setup(|app| {
+            #[cfg(desktop)]
+            app.manage(PanelState::default());
+
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -275,7 +423,12 @@ pub fn run() {
             match event {
                 // Ein Menueleisten-Panel schliesst sich, sobald man woanders
                 // hinklickt. Ohne das bliebe es ueber allen Fenstern stehen.
-                tauri::WindowEvent::Focused(false) if window.label() == PANEL => {
+                //
+                // Genau das ist aber der angeheftete Modus: dort ist das
+                // Stehenbleiben der Zweck, und das Verstecken waere der Fehler.
+                tauri::WindowEvent::Focused(false)
+                    if window.label() == PANEL && !panel_is_pinned(window.app_handle()) =>
+                {
                     let _ = window.hide();
                 }
                 // Das Hauptfenster zu schliessen beendet die App nicht - sie
