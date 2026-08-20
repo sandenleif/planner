@@ -248,8 +248,18 @@ Aus der Kommandozeile: `npx wrangler deploy` (nach `npm run build`).
 
 #### Die Umgebungsvariablen sind der Knackpunkt
 
-In den Worker-Einstellungen unter Settings → Variables and Secrets müssen
-stehen:
+Vite ersetzt `VITE_*` zur **Buildzeit** und backt die Werte ins Bundle. Wo sie
+hingehören, hängt deshalb davon ab, wo gebaut wird:
+
+| Deploy-Weg | Wo die Variablen stehen müssen |
+|---|---|
+| `npx wrangler deploy` (Upload) | lokal in `.env.local`, vor `npm run build` |
+| Git-Anbindung (Workers Builds) | in den Build-Einstellungen des Workers |
+
+Was **nicht** funktioniert: Settings → Variables and Secrets. Das sind
+Laufzeit-Variablen für Worker-Code. Diese App ist rein statisch und liest zur
+Laufzeit gar nichts — die Werte stehen längst im ausgelieferten JavaScript
+oder eben nicht.
 
 ```
 VITE_SUPABASE_URL        https://<projekt>.supabase.co
@@ -272,8 +282,8 @@ Zwei Wege, das zu erkennen, ohne zu raten:
   curl -s https://<domain>/assets/index-*.js | wc -c
   ```
 
-Wichtig: Vite ersetzt `VITE_*` zur **Buildzeit**, nicht zur Laufzeit. Neue
-Werte greifen erst nach einem erneuten Deploy, nicht nach dem Speichern.
+Neue Werte greifen erst nach einem erneuten **Build plus Deploy** — den Worker
+neu zu starten ändert nichts, weil die Werte im Bundle stehen.
 
 #### Nach jedem neuen Domainnamen
 
