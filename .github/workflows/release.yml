@@ -1,0 +1,135 @@
+name: Release
+
+# Baut die Desktop-Apps und veröffentlicht sie als GitHub Release samt
+# Update-Manifest. Ausgelöst durch einen Versions-Tag:
+#
+#   npm version 0.2.0 && git push --follow-tags
+#
+# Warum überhaupt CI: macOS-Apps lassen sich nur auf macOS bauen. Ohne einen
+# Mac im Haus ist ein macOS-Runner der einzige Weg — und nebenbei fällt der
+# Windows- und Linux-Build mit ab.
+on:
+  push:
+    tags:
+      - 'v*'
+  # Zum Ausprobieren ohne Tag - erzeugt einen Entwurf, kein öffentliches Release.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      # Ein fehlgeschlagener Mac-Build soll den Windows-Build nicht abbrechen.
+      # Sonst steht man mit gar nichts da statt mit der Hälfte.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+            name: macOS (Apple Silicon)
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+            name: macOS (Intel)
+          - platform: ubuntu-22.04
+            args: ''
+            name: Linux
+          - platform: windows-latest
+            args: ''
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Rust einrichten
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Auf macOS beide Architekturen, sonst schlägt --target fehl.
+          targets: ${{ contains(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust-Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          # Sonst teilen sich Intel- und ARM-Build denselben Cache-Schlüssel
+          # und überschreiben sich gegenseitig.
+          key: ${{ matrix.args }}
+
+      - name: Systemabhängigkeiten (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: npm-Pakete
+        run: npm ci
+
+      - name: Bauen und veröffentlichen
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # Ohne diesen Schlüssel entsteht kein signiertes Update - der
+          # Updater lehnt unsignierte Pakete ab, und zwar zu Recht.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+          # Vite backt diese Werte zur BUILDZEIT ins Bundle. Fehlen sie, baut
+          # der Job durch und liefert eine App im lokalen Modus aus - ohne
+          # Login, ohne Sync. Der Build schlägt dabei NICHT fehl, deshalb
+          # steht die Prüfung weiter unten.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
+
+          # Notarisierung: nur gesetzt, wenn die Secrets hinterlegt sind.
+          # Ohne sie entsteht eine unsignierte App - lauffähig, aber Gatekeeper
+          # verlangt beim ersten Start Rechtsklick → Öffnen.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__-test' }}
+          releaseName: 'Planner __VERSION__'
+          releaseBody: |
+            Automatisch erzeugt. Die Update-Funktion in der App findet diese
+            Version selbst — ein manueller Download ist nur für die
+            Erstinstallation nötig.
+          # Entwurf, bis alle Plattformen fertig sind. Erst dann sieht der
+          # Updater das Release - sonst holt er sich ein halbes.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+  # Läuft nach allen Plattformen und beantwortet die eine Frage, die man
+  # sonst erst nach der Installation stellt.
+  check:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Sind die Supabase-Secrets gesetzt?
+        run: |
+          if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "::warning::VITE_SUPABASE_ANON_KEY ist nicht gesetzt - die gebauten Apps laufen im lokalen Modus (kein Login, kein Sync)."
+          else
+            echo "Supabase-Secrets sind gesetzt."
+          fi
+          if [ -z "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY fehlt - es entsteht kein signiertes Update, der Updater wird das Paket ablehnen."
+            exit 1
+          fi
