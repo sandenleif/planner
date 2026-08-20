@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Basisrechte, Deep-Link (OAuth-Rueckweg), Opener fuer den Systembrowser, Updater und Neustart nach dem Einspielen",
+  "description": "Basisrechte, Deep-Link (OAuth-Rueckweg) und Opener fuer den Systembrowser. Alles, was es auf jeder Plattform gibt - Plattformspezifisches steht in desktop.json, panel.json und android.json.",
   "windows": [
     "main",
     "panel"
@@ -10,8 +10,6 @@
     "core:default",
     "deep-link:default",
     "opener:allow-open-url",
-    "opener:allow-default-urls",
-    "updater:default",
-    "process:allow-restart"
+    "opener:allow-default-urls"
   ]
 }

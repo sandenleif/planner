@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="planner_widget_label">Planner</string>
+    <string name="planner_widget_description">Was heute ansteht</string>
+    <string name="planner_widget_nothing_due">Nichts fällig</string>
+    <string name="planner_widget_empty">Nichts fällig</string>
+    <string name="planner_widget_refresh">Aktualisieren</string>
+
+    <!-- Erscheint, solange die App nach der Installation noch nie offen war. -->
+    <string name="planner_widget_no_data">App einmal öffnen</string>
+    <string name="planner_widget_stale_today">Stand von heute früh</string>
+
+    <plurals name="planner_widget_due_today">
+        <item quantity="one">%d Aufgabe heute</item>
+        <item quantity="other">%d Aufgaben heute</item>
+    </plurals>
+
+    <plurals name="planner_widget_overdue">
+        <item quantity="one">davon %d überfällig</item>
+        <item quantity="other">davon %d überfällig</item>
+    </plurals>
+
+    <plurals name="planner_widget_stale_days">
+        <item quantity="one">Stand von vor %d Tag</item>
+        <item quantity="other">Stand von vor %d Tagen</item>
+    </plurals>
+</resources>

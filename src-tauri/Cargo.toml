@@ -43,3 +43,12 @@ tauri-plugin-process = "2"
 # Platziert das Menueleisten-Panel unter dem Tray-Symbol. Ohne das muesste
 # man die Bildschirmkoordinaten selbst ausrechnen - je Plattform anders.
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
+
+# Nur Android: die Bruecke zum Homescreen-Widget (Kotlin + RemoteViews).
+#
+# Bewusst nur hier und nicht in [dependencies]: das Plugin bringt einen
+# Gradle-Teil mit, der ausserhalb eines Android-Builds nichts zu suchen hat.
+# So bleibt der Desktop-Build von Aenderungen am Widget unberuehrt - und der
+# ist es, der die Releases baut.
+[target.'cfg(target_os = "android")'.dependencies]
+tauri-plugin-planner-widget = { path = "plugins/planner-widget" }

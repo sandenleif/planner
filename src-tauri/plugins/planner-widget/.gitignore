@@ -1,0 +1,4 @@
+# Nur relevant, wenn das Plugin einmal fuer sich gebaut wird - im
+# App-Build landet alles in src-tauri/target.
+target/
+Cargo.lock

@@ -368,6 +368,17 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
 
+    // Nur Android: die Bruecke zum Homescreen-Widget. Bewusst ein eigenes
+    // Plugin und keine Datei, die beide Seiten lesen - der Kotlin-Teil muss
+    // nach dem Schreiben den AppWidgetManager anstossen, sonst zeigt das
+    // Widget bis zum naechsten Aktualisierungsintervall den alten Stand.
+    //
+    // Die Abhaengigkeit steht in Cargo.toml unter target.'cfg(target_os =
+    // "android")'. Damit kann ein Fehler im Widget-Plugin den Desktop-Build
+    // nicht anfassen - und der liefert die Releases aus.
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_planner_widget::init());
+
     builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())

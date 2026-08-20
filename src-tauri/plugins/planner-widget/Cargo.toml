@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-planner-widget"
+version = "1.0.0"
+description = "Bruecke zum Android-Homescreen-Widget"
+authors = ["Leif Sanden"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# Ueber `links` findet tauri-build den Gradle-Teil dieses Plugins wieder: das
+# Build-Skript meldet den Pfad ueber Cargo-Link-Metadaten, und die traegt Cargo
+# nur weiter, wenn das Paket einen links-Namen hat. Ohne diese Zeile baut alles
+# durch, aber das Kotlin landet nie im APK - der Fehler zeigt sich erst zur
+# Laufzeit als "plugin planner-widget not found".
+links = "tauri-plugin-planner-widget"
+
+[dependencies]
+tauri = { version = "2.11.3" }
+serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

@@ -1,0 +1,9 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = """
+Erlaubt der App, den Widget-Stand zu setzen. Mehr kann das Plugin nicht: es
+gibt keinen Befehl, der etwas zurueckliest. Ein Fehler in der WebView kann
+darueber also nichts erfahren, nur etwas anzeigen lassen.
+"""
+permissions = ["allow-update-snapshot"]

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kopfzeile, Liste, Leerzustand. Mehr passt in ein Widget nicht hinein, ohne
+  dass es zur schlechteren Kopie der App wird.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/planner_widget_background"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:id="@+id/planner_widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/planner_widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/planner_widget_ink"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/planner_widget_nothing_due" />
+
+            <TextView
+                android:id="@+id/planner_widget_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/planner_widget_muted"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/planner_widget_label" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/planner_widget_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="7dp"
+            android:src="@drawable/planner_widget_refresh"
+            android:tint="@color/planner_widget_muted"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/planner_widget_refresh" />
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/planner_widget_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="6dp"
+        android:divider="@null"
+        android:dividerHeight="0dp" />
+
+    <TextView
+        android:id="@+id/planner_widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:textSize="12sp"
+        android:textColor="@color/planner_widget_muted"
+        android:text="@string/planner_widget_empty" />
+
+</LinearLayout>

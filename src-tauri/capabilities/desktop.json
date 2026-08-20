@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Updater und Neustart nach dem Einspielen. Musste aus default.json heraus: die beiden Plugins sind in Cargo.toml auf Desktop beschraenkt, und eine Berechtigung fuer ein Plugin, das es auf Android gar nicht gibt, laesst den Android-Build mit 'permission not found' abbrechen - noch bevor eine Zeile Kotlin uebersetzt wird.",
+  "platforms": ["macOS", "windows", "linux"],
+  "windows": ["main", "panel"],
+  "permissions": ["updater:default", "process:allow-restart"]
+}

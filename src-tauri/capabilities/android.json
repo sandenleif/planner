@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/android-schema.json",
+  "identifier": "android",
+  "description": "Erlaubt der App, den Stand des Homescreen-Widgets zu setzen.",
+  "platforms": ["android"],
+  "windows": ["main"],
+  "permissions": ["planner-widget:default"]
+}

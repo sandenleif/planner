@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wird beim Bauen in das Manifest der App hineingemischt (Manifest Merger).
+  Deshalb stehen hier vollstaendige Klassennamen und keine Kurzform mit
+  fuehrendem Punkt: die loeste der Merger gegen das Paket der APP auf, nicht
+  gegen das dieser Bibliothek - und zeigte dann ins Leere.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          exported="false" ist richtig und kein Versehen: Der AppWidgetManager
+          gehoert zum System und darf trotzdem zustellen. Fremde Apps haetten
+          hier nichts zu suchen - ab Android 12 ist es fuer Widget-Receiver
+          ohnehin die vorgeschriebene Einstellung.
+        -->
+        <receiver
+            android:name="de.leifsanden.planner.widget.PlannerWidgetProvider"
+            android:label="@string/planner_widget_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/planner_widget_info" />
+        </receiver>
+
+        <!--
+          Fuellt die Liste im Widget. Die Berechtigung ist Pflicht: ohne sie
+          weigert sich das System, den Dienst an den Launcher zu binden, und
+          das Widget bleibt leer.
+        -->
+        <service
+            android:name="de.leifsanden.planner.widget.PlannerWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  updatePeriodMillis ist bewusst 0: Ein Wecklauf des Systems koennte ohnehin
+  nur denselben gespeicherten Stand neu zeichnen - neue Daten gaebe es nur,
+  wenn die App liefe. Aktualisiert wird deshalb, wenn die App etwas aendert,
+  und auf Tippen des Knopfes. Alles andere waere Batterieverbrauch ohne Ertrag.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/planner_widget"
+    android:previewLayout="@layout/planner_widget"
+    android:description="@string/planner_widget_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

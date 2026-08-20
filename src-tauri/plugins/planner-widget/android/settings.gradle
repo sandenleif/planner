@@ -1,0 +1,6 @@
+// Nur fuer den Fall, dass dieser Ordner einmal fuer sich geoeffnet wird (etwa
+// in Android Studio, um die Layouts anzusehen). Im APK-Build zaehlt diese
+// Datei nicht: dort bindet src-tauri/gen/android/tauri.settings.gradle das
+// Modul ein, und die Zeile unten wird nie gelesen.
+include ':tauri-android'
+project(':tauri-android').projectDir = new File('./.tauri/tauri-api')
