@@ -233,7 +233,10 @@ npm run android:build   # APK/AAB
 Netlify, Vercel oder jeden Webserver. Die App nutzt Hash-Routing, deshalb
 braucht es keine Server-Rewrites.
 
-### Cloudflare Pages
+### Cloudflare Workers
+
+Die Konfiguration steht in `wrangler.jsonc` — rein statische Auslieferung aus
+`dist/`, kein Worker-Code.
 
 | Einstellung | Wert |
 |---|---|
@@ -241,8 +244,12 @@ braucht es keine Server-Rewrites.
 | Build output directory | `dist` |
 | Node-Version | aus `.node-version` (22) |
 
-**Die Umgebungsvariablen nicht vergessen.** In den Pages-Projekteinstellungen
-unter Settings → Environment variables müssen stehen:
+Aus der Kommandozeile: `npx wrangler deploy` (nach `npm run build`).
+
+#### Die Umgebungsvariablen sind der Knackpunkt
+
+In den Worker-Einstellungen unter Settings → Variables and Secrets müssen
+stehen:
 
 ```
 VITE_SUPABASE_URL        https://<projekt>.supabase.co
@@ -250,21 +257,44 @@ VITE_SUPABASE_ANON_KEY   <anon-Key>
 VITE_PUBLIC_APP_URL      https://<deine-domain>
 ```
 
-Fehlen sie, schlägt der Build **nicht** fehl — er erzeugt eine App im lokalen
-Modus: kein Login, Daten nur im Browser des Besuchers. Das sieht auf den ersten
-Blick aus wie eine funktionierende Seite, ist aber die falsche. (Erkennbar am
-„lokal"-Abzeichen oben links in der Seitenleiste.)
+Fehlen sie, schlägt der Build **nicht** fehl. Er erzeugt eine App im lokalen
+Modus: kein Login, Daten nur im Browser des jeweiligen Besuchers. Das sieht aus
+wie eine funktionierende Seite, ist aber die falsche.
 
-Vite ersetzt `VITE_*` zur **Buildzeit**. Neue Werte greifen also erst nach
-einem erneuten Deploy, nicht sofort nach dem Speichern.
+Zwei Wege, das zu erkennen, ohne zu raten:
 
-**Nach dem ersten Deploy**: die Pages-Adresse in Supabase unter
-Authentication → URL Configuration → Redirect URLs eintragen, sonst schlägt
-die Google-Anmeldung auf der ausgelieferten Seite fehl:
+* Das „lokal"-Abzeichen oben links in der Seitenleiste.
+* Die Bundle-Größe. Ist `VITE_SUPABASE_URL` zur Buildzeit leer, faltet Vite
+  `supabaseConfigured` zu `false` und wirft `@supabase/supabase-js` komplett
+  heraus — rund 408 KB statt 609 KB:
+
+  ```bash
+  curl -s https://<domain>/assets/index-*.js | wc -c
+  ```
+
+Wichtig: Vite ersetzt `VITE_*` zur **Buildzeit**, nicht zur Laufzeit. Neue
+Werte greifen erst nach einem erneuten Deploy, nicht nach dem Speichern.
+
+#### Nach jedem neuen Domainnamen
+
+Jede Adresse, unter der die App erreichbar ist, muss in Supabase unter
+Authentication → URL Configuration → Redirect URLs stehen — sonst schlägt die
+Google-Anmeldung dort fehl:
 
 ```
-https://<projekt>.pages.dev
+https://<worker>.workers.dev
+https://planner.example.com
 ```
+
+Und `VITE_PUBLIC_APP_URL` auf die endgültige Adresse setzen: davon hängen die
+Einladungslinks ab. Steht dort die alte Adresse, verschickt man Links, die
+später ins Leere zeigen.
+
+#### Eigene Domain
+
+Die Zone muss bei Cloudflare liegen. Dann entweder im Dashboard unter
+Settings → Domains & Routes eintragen, oder den auskommentierten `routes`-Block
+in `wrangler.jsonc` aktivieren.
 
 ### Security-Header
 
