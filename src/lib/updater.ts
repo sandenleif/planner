@@ -1,4 +1,4 @@
-import { isDesktop } from './platform'
+import { isDesktop, isTauri } from './platform'
 import { toast } from '@/ui/toast'
 
 /**
@@ -9,6 +9,11 @@ import { toast } from '@/ui/toast'
  * Klick wird geladen und eingespielt — ungefragt an einer laufenden App
  * herumzuschrauben ist keine gute Idee, und ein Neustart mitten im Tippen
  * erst recht nicht.
+ *
+ * Dazu `checkForUpdatesNow()` für den Knopf in den Einstellungen. Beide Wege
+ * teilen sich Abfrage und Installation; der Unterschied liegt allein darin,
+ * was passiert, wenn es nichts zu holen gibt: die automatische Prüfung
+ * schweigt, die angestoßene antwortet.
  *
  * Die Pakete sind signiert; der öffentliche Schlüssel steckt in
  * `tauri.conf.json`. Ein Update, dessen Signatur nicht passt, wird abgelehnt.
@@ -39,8 +44,7 @@ export function startUpdateChecks(): () => void {
   const check = async () => {
     if (cancelled) return
     try {
-      const { check: checkForUpdate } = await import('@tauri-apps/plugin-updater')
-      const update = await checkForUpdate()
+      const update = await fetchUpdate()
       if (!update || cancelled) return
 
       toast.withAction(
@@ -68,6 +72,68 @@ export function startUpdateChecks(): () => void {
     clearTimeout(timer)
     clearInterval(interval)
   }
+}
+
+// ------------------------------------------------------- Suchen auf Zuruf
+
+/**
+ * Ergebnis einer angestoßenen Suche.
+ *
+ * Die automatische Prüfung darf schweigen, wenn nichts da ist — die hier
+ * gestartete nicht. Wer auf einen Knopf drückt, erwartet eine Antwort, und
+ * „keine Meldung" ist von „hat nicht funktioniert" nicht zu unterscheiden.
+ * Deshalb hat jeder Ausgang einen eigenen Fall statt eines nullable-Rückgabe­
+ * werts.
+ */
+export type UpdateCheck =
+  | { status: 'available'; version: string; install: () => void }
+  | { status: 'current' }
+  /** Web und Android: dort aktualisiert der Browser bzw. der Store. */
+  | { status: 'unsupported' }
+  | { status: 'failed'; message: string }
+
+export async function checkForUpdatesNow(): Promise<UpdateCheck> {
+  if (!isDesktop) return { status: 'unsupported' }
+
+  try {
+    const update = await fetchUpdate()
+    if (!update) return { status: 'current' }
+
+    return {
+      status: 'available',
+      version: update.version,
+      install: () => void install(update),
+    }
+  } catch (error) {
+    return {
+      status: 'failed',
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+/**
+ * Die laufende Version — aus `tauri.conf.json`, nicht aus `package.json`.
+ *
+ * Nach dem Einspielen eines Updates ist das die einzige Angabe, die stimmt:
+ * das JavaScript-Bundle wird mit ausgetauscht, aber gefragt wird der native
+ * Teil, und der ist es, den der Updater ersetzt hat.
+ */
+export async function appVersion(): Promise<string | null> {
+  if (!isTauri) return null
+
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app')
+    return await getVersion()
+  } catch (error) {
+    console.warn('Version nicht abrufbar:', error)
+    return null
+  }
+}
+
+async function fetchUpdate(): Promise<InstallableUpdate | null> {
+  const { check } = await import('@tauri-apps/plugin-updater')
+  return (await check()) as InstallableUpdate | null
 }
 
 interface InstallableUpdate {

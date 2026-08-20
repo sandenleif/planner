@@ -1,12 +1,13 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Download, LogOut, Monitor, Moon, Sun, Upload } from 'lucide-react'
+import { Download, LogOut, Monitor, Moon, RefreshCw, Sun, Upload } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/auth/AuthProvider'
 import { useRepository } from '@/data/RepositoryProvider'
 import type { PlannerBackup } from '@/data/types'
 import { useTheme, type Theme } from '@/app/theme'
-import { isTauri, osName, type OsName } from '@/lib/platform'
+import { isDesktop, isTauri, osName, type OsName } from '@/lib/platform'
+import { appVersion, checkForUpdatesNow, type UpdateCheck } from '@/lib/updater'
 import { Dialog } from '@/ui/Dialog'
 
 const OS_LABEL: Record<OsName, string> = {
@@ -156,8 +157,96 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
         )}
       </section>
 
+      {/* Nur montiert, solange der Dialog offen ist: so beginnt jedes Öffnen
+          ohne das Suchergebnis von vorhin, das inzwischen überholt sein kann. */}
+      {isDesktop && open && <UpdateSection onClose={onClose} />}
+
       {status && <p className="mt-4 text-sm text-accent-600">{status}</p>}
     </Dialog>
+  )
+}
+
+/**
+ * Version und Update-Suche.
+ *
+ * Nur auf dem Desktop — im Browser ist Neuladen die Aktualisierung, auf Android
+ * macht das der Store.
+ *
+ * Die Antwort steht im Dialog und nicht im Toaster: der Dialog liegt über
+ * `showModal()` in der Top-Layer, eine Kurzmeldung am unteren Rand läge
+ * dahinter. Zum Installieren schließt der Dialog deshalb wieder — der
+ * Fortschritt kommt als Meldung, und die soll man sehen können.
+ */
+function UpdateSection({ onClose }: { onClose: () => void }) {
+  const [version, setVersion] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [result, setResult] = useState<UpdateCheck | null>(null)
+
+  useEffect(() => {
+    void appVersion().then(setVersion)
+  }, [])
+
+  const search = async () => {
+    setChecking(true)
+    setResult(null)
+    try {
+      setResult(await checkForUpdatesNow())
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <section className="mt-5 border-t border-subtle pt-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+        Programm
+      </h3>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-muted">
+          {version ? `Version ${version}` : 'Version wird ermittelt …'}
+        </span>
+        <button
+          className="btn-outline shrink-0"
+          onClick={() => void search()}
+          disabled={checking}
+        >
+          <RefreshCw size={14} className={clsx(checking && 'animate-spin')} />
+          {checking ? 'Wird gesucht …' : 'Nach Updates suchen'}
+        </button>
+      </div>
+
+      {result?.status === 'current' && (
+        <p className="mt-2 text-xs text-muted">Das ist bereits die neuste Version.</p>
+      )}
+
+      {result?.status === 'failed' && (
+        <p className="mt-2 text-xs text-red-600">
+          Suche fehlgeschlagen: {result.message}
+        </p>
+      )}
+
+      {result?.status === 'available' && (
+        <button
+          className="btn-primary mt-3 w-full"
+          onClick={() => {
+            // Erst schließen, dann anstoßen: der Fortschritt läuft über
+            // Kurzmeldungen, und die lägen hinter dem offenen Dialog.
+            const start = result.install
+            onClose()
+            start()
+          }}
+        >
+          Version {result.version} installieren
+        </button>
+      )}
+
+      <p className="mt-2 text-xs text-muted">
+        Aktualisierungen kommen von GitHub Releases. Vor dem Einspielen wird die
+        Signatur geprüft — ein Paket, das nicht mit dem passenden Schlüssel
+        signiert ist, wird abgelehnt.
+      </p>
+    </section>
   )
 }
 
