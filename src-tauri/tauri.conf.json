@@ -67,6 +67,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "category": "Productivity",
     "shortDescription": "Aufgaben und geteilte Listen",
