@@ -127,7 +127,13 @@ fn create_panel_window(app: &AppHandle) -> tauri::Result<()> {
     // traegt die knapp deckende Flaeche aus index.css den Panel allein.
     #[cfg(target_os = "macos")]
     let builder = {
-        use tauri::utils::config::{WindowEffect, WindowEffectState, WindowEffectsConfig};
+        // WindowEffect und WindowEffectState liegen im Wurzelmodul von
+        // tauri-utils, nur WindowEffectsConfig in ::config. In ::config sind
+        // die beiden ebenfalls sichtbar, aber privat importiert - der Compiler
+        // meldet das als "private enum" und nicht als "gibt es nicht".
+        use tauri::utils::config::WindowEffectsConfig;
+        use tauri::utils::{WindowEffect, WindowEffectState};
+
         builder.effects(WindowEffectsConfig {
             effects: vec![WindowEffect::Popover],
             state: Some(WindowEffectState::Active),
