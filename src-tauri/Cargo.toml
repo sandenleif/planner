@@ -25,6 +25,11 @@ log = "0.4"
 # Infobereich bzw. in der Menuezeile.
 tauri = { version = "2.11.3", features = ["tray-icon"] }
 tauri-plugin-log = "2"
+# OAuth-Rueckweg: Google schickt den Code an planner://auth-callback, das
+# System reicht ihn an die laufende App weiter.
+tauri-plugin-deep-link = "2"
+# Oeffnet die Anmeldeseite im Systembrowser statt in der App-WebView.
+tauri-plugin-opener = "2"
 
 # Nur Desktop: Android und iOS kennen weder globale Tastenkuerzel noch ein
 # Konzept von "eine Instanz pro Rechner".

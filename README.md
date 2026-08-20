@@ -109,12 +109,61 @@ Akt 8 stammt aus einem echten Befund des Supabase-Security-Advisors: das
 `0004_function_privileges.sql`, nachgestellt in Akt 8 — ein Befund, den kein
 Test nachstellt, kommt zurück.
 
-### Google-Anmeldung
+### Google-Anmeldung einrichten
 
-Optional, im Dashboard unter Authentication → Providers → Google. Im Browser
-funktioniert der Rücksprung sofort; in der Tauri-App braucht er einen
-Deep-Link-Handler (`tauri-plugin-deep-link`) — bis dahin ist dort E-Mail plus
-Passwort der verlässliche Weg.
+Der Code steht auf allen Plattformen. Es fehlen nur die Zugangsdaten, und die
+müssen aus zwei Konsolen kommen.
+
+**1. Google Cloud Console** → APIs & Services → Credentials → OAuth client ID
+(Typ „Web application"). Dort eintragen:
+
+| Feld | Wert |
+|---|---|
+| Authorized JavaScript origins | `https://<projekt>.supabase.co` |
+| Authorized redirect URIs | `https://<projekt>.supabase.co/auth/v1/callback` |
+
+Wichtig: Das ist die Adresse **von Supabase**, nicht die der App. Google spricht
+nur mit Supabase; erst Supabase leitet zur App weiter. Der häufigste
+Einrichtungsfehler ist, hier `localhost:1420` einzutragen.
+
+Beim ersten Mal verlangt Google außerdem einen OAuth-Consent-Screen. Solange er
+auf „Testing" steht, dürfen sich nur eingetragene Testnutzer anmelden.
+
+**2. Supabase** → Authentication → Providers → Google: aktivieren, Client ID und
+Client Secret aus Schritt 1 einfügen.
+
+**3. Supabase** → Authentication → URL Configuration → Redirect URLs. Hier
+müssen alle Adressen stehen, auf die zurückgesprungen werden darf:
+
+```
+http://localhost:1420          Entwicklung im Browser
+planner://auth-callback        Desktop und Android
+https://deine-domain.de        produktive Web-Version
+```
+
+Fehlt ein Eintrag, bricht Supabase mit „requested path is invalid" ab. Die App
+übersetzt das in einen Satz, der auf diese Stelle zeigt.
+
+#### Warum in der App der Systembrowser aufgeht
+
+Google lehnt Anmeldungen in eingebetteten WebViews ab — und das zu Recht: eine
+App, die das Passwortfeld selbst rendert, könnte mitlesen. Deshalb macht die
+Desktop- und Android-Version es so:
+
+1. Sie holt die Anmelde-URL von Supabase, folgt ihr aber nicht selbst.
+2. Sie öffnet sie im Systembrowser, wo die echte Adresszeile sichtbar ist.
+3. Supabase schickt den Browser danach auf `planner://auth-callback?code=…`.
+4. Das Betriebssystem reicht die URL an die laufende App weiter, die den Code
+   gegen eine Sitzung tauscht.
+
+Der PKCE-Verifier bleibt dabei im localStorage derselben WebView und verlässt
+das Gerät nie — deshalb ist der Code allein wertlos, falls ihn jemand abfängt.
+
+Unter Windows und Linux trägt normalerweise der Installer das Schema
+`planner://` ins System ein. Im Entwicklungsmodus gibt es keinen Installer,
+deshalb registriert die App es beim Start selbst (`register_all()` in
+`src-tauri/src/lib.rs`). Ohne das führt der Rücksprung ins Leere, und zwar
+ohne Fehlermeldung.
 
 ## Architektur
 
@@ -183,6 +232,12 @@ npm run android:build   # APK/AAB
 `npm run build` erzeugt `dist/` — ein statischer Ordner für Netlify, Vercel,
 Cloudflare Pages oder jeden Webserver. Die App nutzt Hash-Routing, deshalb
 braucht es keine Server-Rewrites.
+
+Der Bundle liegt bei rund 610 KB roh, 177 KB gzip. Gut die Hälfte davon ist
+`@supabase/supabase-js`. Baut man ohne `.env.local`, sind es nur 408 KB — Vite
+faltet dann `supabaseConfigured` zu `false` und wirft die ganze Bibliothek
+heraus. Wer Zahlen vergleicht, sollte also wissen, welche der beiden Builds
+gemeint ist.
 
 ## Nächste Schritte
 

@@ -1,7 +1,15 @@
-import { createContext, use, useEffect, useMemo, useState } from 'react'
+import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { getSupabase, supabaseConfigured } from '@/lib/supabase'
+import { isTauri } from '@/lib/platform'
+import {
+  clearOAuthParamsFromUrl,
+  listenForOAuthCallback,
+  oauthRedirectUrl,
+  openExternally,
+  readOAuthCallback,
+} from './oauth'
 
 /**
  * Authentifizierung - oder deren bewusste Abwesenheit.
@@ -21,6 +29,15 @@ export interface AuthState {
   userId: string | null
   email: string | null
   displayName: string | null
+  avatarUrl: string | null
+  /**
+   * Fehler aus einem OAuth-Rueckweg. Der passiert ausserhalb jeder
+   * Komponente - deshalb liegt er hier und nicht im Anmeldebildschirm.
+   */
+  oauthError: string | null
+  clearOAuthError(): void
+  /** Laeuft gerade eine Google-Anmeldung? Steuert nur die Anzeige. */
+  oauthPending: boolean
   signInWithPassword(email: string, password: string): Promise<void>
   signUpWithPassword(email: string, password: string): Promise<{ needsConfirm: boolean }>
   signInWithGoogle(): Promise<void>
@@ -32,6 +49,8 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(supabaseConfigured)
+  const [oauthError, setOAuthError] = useState<string | null>(null)
+  const [oauthPending, setOAuthPending] = useState(false)
 
   useEffect(() => {
     const supabase = getSupabase()
@@ -48,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
       setLoading(false)
+      if (next) setOAuthPending(false)
     })
 
     return () => {
@@ -56,9 +76,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /** Loest einen Rueckkehr-Code gegen eine Sitzung ein. */
+  const exchangeCode = useCallback(async (rawUrl: string) => {
+    const { code, error } = readOAuthCallback(rawUrl)
+
+    if (error) {
+      setOAuthError(translateAuthError(error))
+      setOAuthPending(false)
+      return
+    }
+    if (!code) return
+
+    const supabase = getSupabase()
+    if (!supabase) return
+
+    const result = await supabase.auth.exchangeCodeForSession(code)
+    if (result.error) {
+      setOAuthError(translateAuthError(result.error.message))
+    }
+    setOAuthPending(false)
+  }, [])
+
+  // Desktop und Android: auf planner://auth-callback horchen.
+  useEffect(() => {
+    if (!isTauri || !supabaseConfigured) return
+
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+
+    void listenForOAuthCallback((url) => void exchangeCode(url)).then((fn) => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [exchangeCode])
+
+  // Browser: den Code hat der Supabase-Client schon selbst eingeloest
+  // (detectSessionInUrl). Hier bleibt nur, Fehler sichtbar zu machen und die
+  // Adresszeile aufzuraeumen.
+  useEffect(() => {
+    if (isTauri || typeof window === 'undefined') return
+
+    const { error } = readOAuthCallback(window.location.href)
+    if (error) setOAuthError(translateAuthError(error))
+
+    // Nach dem Auslesen - sonst waere der Fehler beim naechsten Render weg,
+    // bevor er angezeigt wurde.
+    clearOAuthParamsFromUrl()
+  }, [])
+
   const value = useMemo<AuthState>(() => {
     const meta = session?.user.user_metadata as
-      | { full_name?: string; name?: string }
+      | { full_name?: string; name?: string; avatar_url?: string; picture?: string }
       | undefined
 
     return {
@@ -68,6 +141,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userId: session?.user.id ?? null,
       email: session?.user.email ?? null,
       displayName: meta?.full_name ?? meta?.name ?? session?.user.email ?? null,
+      avatarUrl: meta?.avatar_url ?? meta?.picture ?? null,
+      oauthError,
+      oauthPending,
+
+      clearOAuthError() {
+        setOAuthError(null)
+      },
 
       async signInWithPassword(email, password) {
         const supabase = getSupabase()
@@ -89,18 +169,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signInWithGoogle() {
         const supabase = getSupabase()
         if (!supabase) throw new Error('Supabase ist nicht konfiguriert')
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin,
-            // offline + consent sind noetig, um einen Refresh-Token fuer die
-            // Google-APIs zu bekommen - Grundlage fuer den spaeteren
-            // Tasks-/Calendar-Sync.
-            queryParams: { access_type: 'offline', prompt: 'consent' },
-            scopes: 'email profile',
-          },
-        })
-        if (error) throw new Error(translateAuthError(error.message))
+
+        setOAuthError(null)
+        setOAuthPending(true)
+
+        try {
+          const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: oauthRedirectUrl(),
+              // In Tauri folgt die App der URL nicht selbst, sondern gibt sie
+              // an den Systembrowser. Google lehnt eingebettete WebViews ab.
+              skipBrowserRedirect: isTauri,
+              // offline + consent liefern einen Google-Refresh-Token - die
+              // Grundlage fuer den spaeteren Tasks-/Calendar-Sync.
+              queryParams: { access_type: 'offline', prompt: 'consent' },
+              scopes: 'email profile',
+            },
+          })
+
+          if (error) throw new Error(translateAuthError(error.message))
+
+          if (isTauri) {
+            if (!data?.url) throw new Error('Supabase hat keine Anmelde-URL geliefert')
+            await openExternally(data.url)
+          }
+          // Im Browser navigiert supabase-js selbst weg - alles danach
+          // passiert nach dem Rücksprung.
+        } catch (err) {
+          setOAuthPending(false)
+          throw err
+        }
       },
 
       async signOut() {
@@ -109,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut()
       },
     }
-  }, [session, loading])
+  }, [session, loading, oauthError, oauthPending])
 
   return <AuthContext value={value}>{children}</AuthContext>
 }
@@ -127,6 +226,28 @@ function translateAuthError(message: string): string {
     'User already registered': 'Für diese E-Mail gibt es schon ein Konto.',
     'Password should be at least 6 characters.':
       'Das Passwort braucht mindestens 6 Zeichen.',
+    access_denied: 'Die Anmeldung wurde abgebrochen.',
+    // Der haeufigste Einrichtungsfehler - deshalb mit Wegbeschreibung.
+    'Unsupported provider: provider is not enabled':
+      'Google ist im Supabase-Projekt noch nicht aktiviert ' +
+      '(Dashboard → Authentication → Providers → Google).',
   }
-  return map[message] ?? message
+
+  if (map[message]) return map[message]
+
+  if (/redirect_uri_mismatch/i.test(message)) {
+    return (
+      'Google akzeptiert die Rücksprung-Adresse nicht. In der Google Cloud ' +
+      'Console muss https://<projekt>.supabase.co/auth/v1/callback als ' +
+      'autorisierter Redirect-URI eingetragen sein.'
+    )
+  }
+  if (/requested path is invalid|redirect.*not allowed/i.test(message)) {
+    return (
+      'Diese Rücksprung-Adresse ist in Supabase nicht freigegeben ' +
+      '(Authentication → URL Configuration → Redirect URLs).'
+    )
+  }
+
+  return message
 }
