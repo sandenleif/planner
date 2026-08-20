@@ -397,9 +397,86 @@ begin
   perform pg_temp.assert(ok, 'Ohne Anmeldung sind keine Listen erreichbar');
 end $$;
 
--- ==================================================================== Fazit
+-- ======================================= Akt 8: Ausfuehrungsrechte
 
 reset role;
+
+/*
+ * Diese Pruefungen gab es zunaechst nicht - der Supabase-Security-Advisor hat
+ * gemeldet, dass anon die Funktionen weiterhin aufrufen darf, obwohl in
+ * 0002_rls.sql ein REVOKE steht. Ursache: Postgres vergibt EXECUTE automatisch
+ * an PUBLIC, und ein REVOKE gegen anon nimmt davon nichts weg. Behoben in
+ * 0004_function_privileges.sql.
+ *
+ * Ein Befund, den ein Test nicht nachstellt, kommt zurueck. Deshalb steht er
+ * ab hier hier.
+ */
+do $$
+declare
+  fn text;
+  helpers text[] := array[
+    'public.is_list_member(uuid)',
+    'public.can_edit_list(uuid)',
+    'public.is_list_owner(uuid)',
+    'public.shares_list_with(uuid)'
+  ];
+begin
+  raise notice '';
+  raise notice '=== Akt 8: Ausfuehrungsrechte auf Funktionen ===';
+
+  perform pg_temp.assert(
+    has_function_privilege('anon', 'public.accept_list_invite(text)', 'EXECUTE') = false,
+    'anon darf accept_list_invite NICHT aufrufen'
+  );
+  perform pg_temp.assert(
+    has_function_privilege('authenticated', 'public.accept_list_invite(text)', 'EXECUTE'),
+    'authenticated darf accept_list_invite aufrufen'
+  );
+
+  foreach fn in array helpers loop
+    perform pg_temp.assert(
+      has_function_privilege('anon', fn, 'EXECUTE') = false,
+      format('anon darf %s NICHT aufrufen', split_part(fn, '(', 1))
+    );
+    -- Die Gegenprobe ist genauso wichtig: entzieht man zu viel, faellt jede
+    -- Policy-Auswertung fuer angemeldete Nutzer auf die Nase.
+    perform pg_temp.assert(
+      has_function_privilege('authenticated', fn, 'EXECUTE'),
+      format('authenticated darf %s aufrufen', split_part(fn, '(', 1))
+    );
+  end loop;
+end $$;
+
+do $$
+declare
+  ohne_pfad text;
+begin
+  -- Zweiter Advisor-Befund: touch_updated_at und tasks_guard hatten kein
+  -- festgesetztes search_path. Eine Funktion ohne festen Suchpfad loest
+  -- unqualifizierte Namen gegen den Pfad des Aufrufers auf.
+  select string_agg(p.proname, ', ' order by p.proname)
+    into ohne_pfad
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname in (
+      'touch_updated_at', 'handle_new_user', 'add_owner_as_member',
+      'tasks_guard', 'is_list_member', 'can_edit_list', 'is_list_owner',
+      'shares_list_with', 'accept_list_invite'
+    )
+    and (
+      p.proconfig is null
+      or not exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+    );
+
+  perform pg_temp.assert(
+    ohne_pfad is null,
+    coalesce('Funktionen ohne search_path: ' || ohne_pfad,
+             'Alle eigenen Funktionen haben ein festes search_path')
+  );
+end $$;
+
+-- ==================================================================== Fazit
 
 do $$
 begin

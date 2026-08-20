@@ -59,11 +59,12 @@ Meldung heraus zurückholen, samt Unterpunkten.
 ## Supabase einrichten
 
 1. Projekt auf <https://supabase.com> anlegen (Free Tier reicht lange).
-2. Die drei Migrationen aus `supabase/migrations/` **in dieser Reihenfolge** im
+2. Die Migrationen aus `supabase/migrations/` **in dieser Reihenfolge** im
    SQL-Editor ausführen:
    - `0001_schema.sql` — Tabellen, Indizes, Trigger
    - `0002_rls.sql` — Row Level Security, das Herzstück der geteilten Listen
    - `0003_realtime.sql` — Live-Sync einschalten
+   - `0004_function_privileges.sql` — Ausführungsrechte und `search_path`
 3. `.env.example` nach `.env.local` kopieren und Project URL plus anon-Key
    eintragen (Dashboard → Settings → API).
 4. `npm run dev` neu starten. Jetzt erscheint der Anmeldebildschirm.
@@ -75,9 +76,10 @@ Wer die Supabase CLI nutzt: `supabase db push` spielt denselben Ordner ein.
 „RLS ist aktiviert" ist keine Aussage über Sicherheit — eine Policy kann
 existieren und trotzdem zu weit sein. `supabase/tests/rls_test.sql` beantwortet
 die Frage stattdessen praktisch: Es legt zwei Testnutzer an, lässt sie
-gegeneinander antreten und prüft 28 Regeln — sieht Bob Alices Aufgaben? Kann
+gegeneinander antreten und prüft 39 Regeln — sieht Bob Alices Aufgaben? Kann
 er in ihre Liste schreiben? Darf ein Editor die Liste löschen? Lässt sich ein
-Einladungstoken zweimal einlösen?
+Einladungstoken zweimal einlösen? Und darf `anon` die SECURITY-DEFINER-
+Funktionen aufrufen?
 
 **Lokal, ohne Supabase** (braucht nur Docker):
 
@@ -95,10 +97,17 @@ eine Regel ist verletzt.
 SQL-Editor einfügen. Der Test läuft in einer Transaktion und endet mit
 `ROLLBACK` — er hinterlässt weder Testdaten noch Testnutzer.
 
-Der Test hat Zähne: mit absichtlich aufgeweichten Policies (`using (true)` auf
+Der Test hat Zähne. Mit absichtlich aufgeweichten Policies (`using (true)` auf
 `tasks_select`, Editoren dürfen löschen, die Rekursionsfalle auf
 `list_members` wieder eingebaut) schlägt er jeweils fehl und benennt die
-verletzte Regel.
+verletzte Regel. Und mit zu weit entzogenen Rechten (`revoke execute … from
+authenticated`) ebenfalls — der Fehler, der die App still zerlegen würde.
+
+Akt 8 stammt aus einem echten Befund des Supabase-Security-Advisors: das
+`revoke execute … from anon` in `0002_rls.sql` lief ins Leere, weil Postgres
+`EXECUTE` automatisch an `PUBLIC` vergibt und `anon` daraus erbt. Behoben in
+`0004_function_privileges.sql`, nachgestellt in Akt 8 — ein Befund, den kein
+Test nachstellt, kommt zurück.
 
 ### Google-Anmeldung
 

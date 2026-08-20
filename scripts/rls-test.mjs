@@ -31,6 +31,7 @@ const SQL_FILES = [
   ['Schema', 'supabase/migrations/0001_schema.sql'],
   ['Row Level Security', 'supabase/migrations/0002_rls.sql'],
   ['Realtime', 'supabase/migrations/0003_realtime.sql'],
+  ['Funktionsrechte', 'supabase/migrations/0004_function_privileges.sql'],
 ]
 
 function docker(args, options = {}) {
