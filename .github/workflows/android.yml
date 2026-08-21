@@ -1,0 +1,84 @@
+name: Android
+
+# Baut nur das APK - ohne die vier Desktop-Plattformen. Erzeugt KEIN Release
+# und ruehrt latest.json nicht an; das APK liegt als Artefakt am Lauf.
+on:
+  workflow_dispatch:
+
+jobs:
+  apk:
+    name: APK (arm64)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: JDK einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: NDK-Pfad durchreichen
+        run: echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+
+      # Nur arm64: Jedes Telefon der letzten zehn Jahre laeuft darauf, und
+      # armv7 dazuzunehmen verdoppelt den Rust-Durchlauf.
+      - name: Rust einrichten
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Rust-Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          key: android
+
+      - name: npm-Pakete
+        run: npm ci
+
+      - name: Gradle-Projekt erzeugen
+        run: npm run android:init
+
+      # Muss auch hier laufen: Ein Debug-APK traegt einen anderen Schluessel
+      # als die Release-Fassung. Wer es installiert, kann sich danach nicht
+      # mehr aktualisieren, sondern muesste deinstallieren - und verloere
+      # dabei die Anmeldung.
+      - name: Release-Signatur einrichten
+        id: signing
+        run: npm run android:release-setup
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Abbrechen, wenn nicht signiert
+        if: steps.signing.outputs.signed != 'true'
+        run: |
+          echo "::error::Ohne Keystore-Secrets entstuende ein Debug-APK - eine Sackgasse."
+          exit 1
+
+      - name: APK bauen
+        run: npm run android:build -- --apk --target aarch64
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_PUBLIC_APP_URL: ${{ secrets.VITE_PUBLIC_APP_URL }}
+
+      - name: Brauchbar benennen
+        run: node scripts/android-publish.mjs
+
+      - name: Zum Herunterladen ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: planner-apk
+          path: dist-android/*.apk
+          if-no-files-found: error
