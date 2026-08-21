@@ -571,6 +571,115 @@
   --border-subtle: oklch(1 0 0 / 0.11);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   Bildschirmwechsel — die Bewegung zu app/screenTransition.ts.
+
+   Auf einer Webseite tauscht ein Klick den Inhalt schlagartig aus. Eine App
+   schiebt: Wer tiefer geht, sieht den neuen Bildschirm von rechts
+   hereinkommen, während der alte nach links weicht. Das ist nicht Zierde —
+   es sagt einem, wo man ist und wo man herkommt.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (pointer: coarse) {
+  main {
+    /* Nur der Inhaltsbereich bewegt sich. Die untere Leiste gehoert zu `root`
+       und bleibt stehen - genau wie die Reiterleiste einer nativen App. */
+    view-transition-name: screen;
+
+    /*
+     * Und sie braucht eine eigene Flaeche.
+     *
+     * Der Browser fotografiert genau das, was das Element malt. Ohne
+     * Hintergrund waere der Schnappschuss dort durchsichtig, wo kein Text
+     * steht - und waehrend des Schiebens saehe man den alten Bildschirm durch
+     * den neuen hindurch. Zwei Listen uebereinander, statt eines Blattes ueber
+     * dem anderen.
+     */
+    background-color: var(--surface-app);
+  }
+}
+
+::view-transition-old(screen),
+::view-transition-new(screen) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+}
+
+/* Vorwaerts: Das Neue kommt von rechts und legt sich oben auf. Das Alte
+   weicht ein Stueck nach links und verliert Licht - es bleibt liegen, statt
+   zu verschwinden. */
+html[data-nav='forward']::view-transition-new(screen) {
+  animation-name: screen-from-right;
+  z-index: 1;
+}
+html[data-nav='forward']::view-transition-old(screen) {
+  animation-name: screen-to-left;
+}
+
+/* Zurueck: Das Oberste faehrt nach rechts hinaus, das Darunterliegende kehrt
+   aus seiner Ausweichstellung zurueck. Genau die Umkehrung. */
+html[data-nav='back']::view-transition-old(screen) {
+  animation-name: screen-to-right;
+  z-index: 1;
+}
+html[data-nav='back']::view-transition-new(screen) {
+  animation-name: screen-from-left;
+}
+
+/* Geschwister - Uebersicht, Heute, Demnaechst. Keine liegt ueber der anderen,
+   also wird geblendet statt geschoben. Eine Schiebebewegung zwischen Reitern
+   behauptete eine Tiefe, die es nicht gibt. */
+html[data-nav='same']::view-transition-old(screen) {
+  animation-name: screen-fade-out;
+}
+html[data-nav='same']::view-transition-new(screen) {
+  animation-name: screen-fade-in;
+}
+
+@keyframes screen-from-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes screen-to-left {
+  to {
+    transform: translateX(-24%);
+    opacity: 0.45;
+  }
+}
+@keyframes screen-to-right {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes screen-from-left {
+  from {
+    transform: translateX(-24%);
+    opacity: 0.45;
+  }
+}
+@keyframes screen-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes screen-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Die Weiche steht schon in screenTransition.ts; hier steht sie ein zweites
+   Mal fuer den Fall, dass die Einstellung sich waehrend eines Wechsels
+   aendert. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(screen),
+  ::view-transition-new(screen) {
+    animation: none;
+  }
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

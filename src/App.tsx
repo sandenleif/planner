@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { CheckCircle2, Search, Settings, WifiOff, X } from 'lucide-react'
 import clsx from 'clsx'
@@ -15,6 +15,7 @@ import { HomePage } from '@/pages/HomePage'
 import { InvitePage } from '@/pages/InvitePage'
 import { ListPage } from '@/pages/ListPage'
 import { PanelPage } from '@/pages/PanelPage'
+import { useScreenTransition } from '@/app/screenTransition'
 import { useTheme } from '@/app/theme'
 import { useWidgetSync } from '@/app/widgetSync'
 import { hasModKey, isAndroid, modKeyLabel } from '@/lib/platform'
@@ -72,6 +73,23 @@ function Shell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const repo = useRepository()
   const { pathname } = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+
+  // Die Ansicht, die gerade GEZEIGT wird. Während eines Bildschirmwechsels
+  // bleibt sie einen Moment lang hinter der echten Adresse zurück - genau in
+  // diesem Moment fotografiert der Browser den alten Zustand.
+  const shown = useScreenTransition()
+
+  /*
+   * Jeder Bildschirm beginnt oben.
+   *
+   * Ohne das erbt die neue Ansicht die Rollposition der alten: Man tippt in
+   * der Mitte einer langen Liste auf „Heute" und landet dort mittendrin. Auf
+   * einer Webseite ist das gewohnt, in einer App ist es ein Fehler.
+   */
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 })
+  }, [shown.pathname])
 
   /*
    * Das Menü schließt bei jedem Ansichtswechsel.
@@ -224,8 +242,11 @@ function Shell() {
           </button>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto">
-          <Routes>
+        {/* `location={shown}` statt der echten Adresse: Damit rendert React
+            waehrend eines Wechsels noch den alten Bildschirm, bis der Browser
+            ihn fotografiert hat. Siehe app/screenTransition.ts. */}
+        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto">
+          <Routes location={shown}>
             <Route path="/" element={<HomePage />} />
             <Route path="/heute" element={<AgendaPage mode="today" />} />
             <Route path="/demnaechst" element={<AgendaPage mode="upcoming" />} />
