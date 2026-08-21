@@ -1,6 +1,6 @@
 [package]
 name = "planner"
-version = "1.0.7"
+version = "1.0.8"
 description = "Fokus, Aufgaben und Gewohnheiten"
 authors = ["Leif Sanden"]
 license = ""
