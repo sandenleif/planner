@@ -27,6 +27,7 @@ import {
 import type { List, Task } from '@/data/types'
 import { buildTaskTree, flattenTree } from '@/data/tree'
 import { isOverdue, todayIso } from '@/lib/date'
+import { osName } from '@/lib/platform'
 import { sortByPosition } from '@/lib/ordering'
 import { listColor } from '@/features/lists/listColors'
 import { DueBadge } from '@/features/tasks/DueBadge'
@@ -461,7 +462,12 @@ function PanelTaskRow({
                 onToggleExpanded()
               }
             }}
-            className="w-full rounded-md border border-subtle bg-app px-2 py-1.5 text-[13px] outline-none focus:border-accent-500"
+            // bg-panel statt bg-app: Auf macOS wird die Panel-Fläche zu Glas,
+            // und die vier --surface-Werte darin sind dann durchsichtig — bis
+            // auf --surface-app, das dort weiter die Färbung des Glases
+            // liefert und deshalb deckend bleiben muss. Ein Feld mit bg-app
+            // wäre auf der Scheibe der einzige undurchsichtige Fleck.
+            className="w-full rounded-md border border-subtle bg-panel px-2 py-1.5 text-[13px] outline-none focus:border-accent-500"
             aria-label="Titel"
           />
 
@@ -542,9 +548,21 @@ function usePanelWindow() {
   // sichtbar werden, darf der Body keine Farbe malen — die Klasse schaltet das
   // in index.css um. Sie steht auf <html>, weil das Panel dieselbe index.html
   // lädt wie das Hauptfenster und die Regel nur hier gelten darf.
+  //
+  // `is-macos` kommt dazu, weil die Glasfläche nur dort etwas hinter sich hat,
+  // das sie zeigen könnte: Auf macOS liegt unter der WebView eine
+  // NSVisualEffectView, die den Schreibtisch durchscheinen lässt (gesetzt in
+  // src-tauri/src/lib.rs). Auf Windows und Linux gibt es das nicht — dort
+  // stünde eine durchsichtige Fläche schlicht auf dem Nichts.
   useEffect(() => {
-    document.documentElement.classList.add('is-panel')
-    return () => document.documentElement.classList.remove('is-panel')
+    const root = document.documentElement
+    root.classList.add('is-panel')
+    root.classList.toggle('is-macos', osName === 'macos')
+
+    return () => {
+      root.classList.remove('is-panel')
+      root.classList.remove('is-macos')
+    }
   }, [])
 
   /**

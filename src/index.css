@@ -360,6 +360,94 @@
     inset 0 0 0 1.5px oklch(0 0 0 / 0.25);
 }
 
+/* ------------------------------------------------------- Glas nur auf macOS
+ *
+ * Hier steht das Panel auf etwas: Unter der WebView liegt eine
+ * NSVisualEffectView mit dem Popover-Material (gesetzt in
+ * src-tauri/src/lib.rs). Sie ist es, die den Schreibtisch dahinter
+ * weichzeichnet - nicht das CSS.
+ *
+ * Das ist der Unterschied, an dem die ganze Sache haengt: `backdrop-filter`
+ * zeichnet nur weich, was IM DOKUMENT dahinter liegt. In einem durchsichtigen
+ * Fenster liegt dort nichts. Die Zeile weiter oben tut auf macOS also nichts
+ * fuer das Bild und kostet trotzdem eine eigene Composite-Ebene - deshalb hier
+ * abgeschaltet.
+ *
+ * Und die Flaeche selbst war mit 92 % Deckung praktisch undurchsichtig. Das
+ * Material lag darunter und kam zu 8 % durch. Unten traegt das Material die
+ * Flaeche, und die Cremefarbe ist nur noch ein Hauch Faerbung darueber.
+ *
+ * ZUM NACHSTELLEN: --glass-tint ist der einzige Knopf. Kleiner = mehr Glas und
+ * mehr Schreibtisch, groesser = mehr Creme und ruhigerer Text. Unter etwa 15 %
+ * wird Text ueber hellen Hintergruenden schwer zu lesen - eine WebView kann
+ * Apples vibrancy-Textmodus nicht mitbenutzen, sie malt stumpfe Farbe.
+ */
+.is-macos .panel-surface {
+  --glass-tint: 26%;
+
+  background-color: color-mix(in oklab, var(--surface-app) var(--glass-tint), transparent);
+
+  /* Licht faellt von oben ein. Ohne diesen Abfall wirkt auch echtes Material
+     wie eine flache Folie. */
+  background-image: linear-gradient(
+    to bottom,
+    oklch(1 0 0 / 0.14) 0%,
+    oklch(1 0 0 / 0.04) 38%,
+    oklch(1 0 0 / 0) 100%
+  );
+
+  backdrop-filter: none;
+
+  /* Der helle Saum GANZ oben ist das, was Glas von Milchplastik unterscheidet:
+     eine Kante, die das Licht faengt. Ringsum nur eine zarte Linie, unten ein
+     dunkler Abschluss - so bekommt die Scheibe Dicke. */
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.45),
+    inset 0 0 0 1px oklch(1 0 0 / 0.1),
+    inset 0 -1px 0 0 oklch(0 0 0 / 0.05);
+
+  /*
+   * Die Flaechen INNERHALB des Panels werden mit durchsichtig.
+   *
+   * Eine deckende Zeile auf Glas sieht aus wie ein Aufkleber auf einer
+   * Fensterscheibe. Apple stapelt stattdessen Glas auf Glas: die Scheibe, und
+   * darauf hellere Plaettchen.
+   *
+   * Es genuegt, die vier --surface-/--border-Werte hier neu zu setzen: Die
+   * Tailwind-Utilities loesen `var(--surface-sunken)` erst am jeweiligen
+   * Element auf (@theme inline schreibt den Namen direkt in die Regel). Jede
+   * Zeile, jeder Knopf und jede Trennlinie im Panel zieht damit mit, ohne dass
+   * eine einzige Komponente davon wissen muss.
+   */
+  --surface-panel: oklch(1 0 0 / 0.4);
+  --surface-sunken: oklch(1 0 0 / 0.32);
+  --surface-hover: oklch(1 0 0 / 0.55);
+  --border-subtle: oklch(0 0 0 / 0.09);
+}
+
+.dark.is-macos .panel-surface {
+  /* Dunkles Material ist von sich aus dichter - weniger Faerbung reicht. */
+  --glass-tint: 20%;
+
+  background-image: linear-gradient(
+    to bottom,
+    oklch(1 0 0 / 0.07) 0%,
+    oklch(1 0 0 / 0.02) 40%,
+    oklch(1 0 0 / 0) 100%
+  );
+
+  box-shadow:
+    inset 0 1px 0 0 oklch(1 0 0 / 0.16),
+    inset 0 0 0 1px oklch(1 0 0 / 0.06),
+    inset 0 -1px 0 0 oklch(0 0 0 / 0.28);
+
+  /* Im Dunkeln hellt man auf, statt abzudunkeln - auch die Trennlinien. */
+  --surface-panel: oklch(1 0 0 / 0.08);
+  --surface-sunken: oklch(1 0 0 / 0.06);
+  --surface-hover: oklch(1 0 0 / 0.13);
+  --border-subtle: oklch(1 0 0 / 0.11);
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
