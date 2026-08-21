@@ -205,13 +205,26 @@ jobs:
 
       # gh ist auf dem Runner vorinstalliert - das spart eine weitere Action
       # in der Lieferkette, nur um eine Datei anzuhängen.
-      - name: APK an das Release hängen
+      #
+      # Das Skript benennt die Dateien brauchbar (aus "app-universal-release.apk"
+      # wird "Planner_1.0.6_universal.apk") und trägt das APK in latest.json
+      # ein. Ohne diesen Eintrag findet die App auf dem Telefon nie eine neuere
+      # Fassung - sie liest dasselbe Manifest wie Windows und macOS, und
+      # tauri-action schreibt dort nur die Desktop-Bundles hinein.
+      #
+      # --signed nur, wenn wirklich signiert wurde: Ein Debug-APK als Update
+      # anzubieten führte auf jedem Gerät zu INSTALL_FAILED_UPDATE_INCOMPATIBLE.
+      - name: An das Release hängen und in latest.json eintragen
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" \
-            $(find src-tauri/gen/android \( -name '*.apk' -o -name '*.aab' \)) --clobber
+          FLAGS=""
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            FLAGS="--signed"
+          fi
+          node scripts/android-publish.mjs --tag "${{ github.ref_name }}" $FLAGS
+
 
   # Läuft nach allen Plattformen und beantwortet die eine Frage, die man
   # sonst erst nach der Installation stellt.
@@ -231,3 +244,7 @@ jobs:
             echo "::error::TAURI_SIGNING_PRIVATE_KEY fehlt - es entsteht kein signiertes Update, der Updater wird das Paket ablehnen."
             exit 1
           fi
+                    if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 fehlt - es entsteht nur ein Debug-APK. Das laesst sich spaeter NICHT durch eine signierte Fassung aktualisieren (andere Signatur), und es wird deshalb auch nicht in latest.json eingetragen."
+          fi
+
