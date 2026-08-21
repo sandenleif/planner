@@ -44,35 +44,15 @@ export function QuickAdd({
     parsed.dueAt !== null || parsed.priority !== null || parsed.recurrence !== null
 
   return (
-    <div className="mb-4">
-      <div
-        className="flex items-center gap-2.5 rounded-xl border border-subtle bg-panel px-4 py-3 transition-colors focus-within:border-current"
-        style={{ color: accent }}
-      >
-        <Plus size={17} className="shrink-0" />
-        <input
-          ref={autoFocusRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit()
-            if (e.key === 'Escape') {
-              setText('')
-              e.currentTarget.blur()
-            }
-          }}
-          placeholder="Aufgabe hinzufügen — z. B. „Steuer morgen !!“"
-          className="min-w-0 flex-1 bg-transparent text-[0.9375rem] text-ink outline-none placeholder:text-muted"
-          aria-label="Neue Aufgabe"
-        />
-      </div>
-
-      {/* Vorschau nur, wenn wirklich etwas erkannt wurde - eine dauerhaft
-          sichtbare leere Zeile waere nur Unruhe. */}
+    <div>
+      {/* Vorschau ÜBER dem Feld, nicht darunter: Das Feld klebt am unteren
+          Rand, alles darunter läge außerhalb des Bildes. Und nur, wenn
+          wirklich etwas erkannt wurde — eine dauerhaft sichtbare leere Zeile
+          wäre nichts als Unruhe. */}
       {hasHints && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 px-1">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
           <Sparkles size={12} className="text-muted" />
-          <span className="mr-0.5 text-xs text-muted">erkannt:</span>
+          <span className="mr-0.5 text-meta text-muted">erkannt:</span>
 
           {parsed.dueAt && (
             <Chip icon={<CalendarDays size={11} />}>
@@ -88,8 +68,33 @@ export function QuickAdd({
         </div>
       )}
 
+      <div
+        className="flex items-center gap-2.5 rounded-[15px] border border-subtle bg-panel px-4 py-3 shadow-card transition-colors focus-within:border-current"
+        style={{ color: accent }}
+      >
+        <Plus size={18} className="shrink-0" strokeWidth={2.4} />
+        <input
+          ref={autoFocusRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submit()
+            if (e.key === 'Escape') {
+              setText('')
+              e.currentTarget.blur()
+            }
+          }}
+          placeholder="Aufgabe hinzufügen — z. B. „Steuer morgen !!“"
+          className="min-w-0 flex-1 bg-transparent text-task text-ink outline-none placeholder:text-muted"
+          aria-label="Neue Aufgabe"
+        />
+      </div>
+
+      {/* Die ausführliche Erklärung nur mit Zeiger. Auf dem Telefon steht die
+          Eingabe knapp über der Tastatur; drei Zeilen Kleingedrucktes darunter
+          wären dort im Weg. Was sie erklärt, steht ohnehin im Platzhalter. */}
       {!hasHints && text.length === 0 && (
-        <p className="mt-2 px-1 text-xs text-muted">
+        <p className="mt-2 px-1 text-meta text-muted [@media(pointer:coarse)]:hidden">
           Versteht „morgen“, „jeden montag“, „am 5.12. um 14:30“, „in 3 tagen“
           und <code className="rounded bg-sunken px-1 py-0.5">!</code> bis{' '}
           <code className="rounded bg-sunken px-1 py-0.5">!!!</code> für die Priorität.

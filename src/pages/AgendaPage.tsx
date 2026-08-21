@@ -1,17 +1,11 @@
 import { useMemo } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import { CalendarCheck, Inbox } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useAllTasks, useLists } from '@/data/hooks'
 import type { Task } from '@/data/types'
 import { addDaysIso, isOverdue, toIsoDate, todayIso } from '@/lib/date'
 import { FlatTaskRow } from '@/features/tasks/FlatTaskRow'
 
 export type AgendaMode = 'today' | 'upcoming'
-
-const HERO_COLOR: Record<AgendaMode, string> = {
-  today: 'oklch(0.37 0.09 152)',
-  upcoming: '#2D6396',
-}
 
 const TITLE: Record<AgendaMode, string> = {
   today: 'Heute',
@@ -64,15 +58,16 @@ export function AgendaPage({ mode }: { mode: AgendaMode }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-6 sm:px-8 sm:py-8">
-      <header
-        className="tile mb-5"
-        style={{ '--tile-color': HERO_COLOR[mode] } as CSSProperties}
-      >
-        <div className="flex items-center gap-2.5">
-          {mode === 'today' ? <CalendarCheck size={20} /> : <Inbox size={20} />}
-          <h1 className="text-2xl font-semibold tracking-tight">{TITLE[mode]}</h1>
-        </div>
-        <p className="mt-1 text-sm opacity-80">
+      {/*
+        Nur Titel und eine Zeile darunter — vorher stand hier eine farbige
+        Kachel mit Symbol. Die Farbe gehört jetzt den Listen: Wenn „Heute"
+        selbst eine Farbe trägt, konkurriert sie mit den sechs Punkten in den
+        Zeilen darunter, und keiner davon bedeutet mehr etwas. Das Symbol
+        steht ohnehin unten am aktiven Reiter.
+      */}
+      <header className="mb-1">
+        <h1 className="text-screen font-bold tracking-tight">{TITLE[mode]}</h1>
+        <p className="mt-1 text-meta text-muted">
           {mode === 'today'
             ? new Intl.DateTimeFormat('de-DE', {
                 weekday: 'long',
@@ -131,18 +126,21 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="mb-5">
+    <section className="mb-4">
       <h2
         className={
-          'mb-2 px-1 text-xs font-semibold uppercase tracking-wider ' +
-          (tone === 'danger' ? 'text-red-600' : 'text-muted')
+          'px-1 pb-1 pt-5 text-label font-bold uppercase tracking-[0.1em] ' +
+          // Die einzige rote Überschrift auf dem Bildschirm. Wäre sie es
+          // nicht, hörte Rot auf zu warnen.
+          (tone === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-muted')
         }
       >
         {title}
       </h2>
-      <div className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
-        {children}
-      </div>
+      {/* Ohne Karte: Die Zeilen liegen auf dem Grund der Seite. Das negative
+          Randmaß hebt die Polsterung von FlatTaskRow auf, damit die Titel
+          bündig unter der Überschrift stehen. */}
+      <div className="-mx-3.5 divide-y divide-ink/8">{children}</div>
     </section>
   )
 }

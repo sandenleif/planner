@@ -360,9 +360,12 @@ function seed(userId: string): LocalDb {
     deletedAt: null,
   })
 
-  const privat = mkList('Persönlich', '#2E6F50', 'a0')
-  const arbeit = mkList('Arbeit', '#2D6396', 'a1')
-  const einkauf = mkList('Einkaufen', '#4E7A34', 'a2')
+  // Drei deutlich verschiedene Toene aus LIST_COLORS - der erste Eindruck der
+  // App soll zeigen, wozu die Farbe da ist. Drei Nuancen derselben Farbe
+  // saehen aus, als waere sie Zierde.
+  const privat = mkList('Persönlich', '#7048E8', 'a0')
+  const arbeit = mkList('Arbeit', '#0C8599', 'a1')
+  const einkauf = mkList('Einkaufen', '#2F9E44', 'a2')
 
   let counter = 0
   const mkTask = (listId: string, title: string, extra: Partial<Task> = {}): Task => ({

@@ -76,10 +76,17 @@ export function ListPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-6 sm:px-8 sm:py-8">
-      {/* Der farbige Kopf greift die Kachel der Übersicht auf - man sieht
-          sofort, in welcher Liste man gelandet ist. */}
+      {/*
+        Der farbige Kopf greift die Kachel der Übersicht auf — man sieht
+        sofort, in welcher Liste man gelandet ist.
+
+        Auf schmalen Schirmen wird daraus ein Band über die volle Breite: Die
+        negativen Ränder heben die Polsterung der Seite auf, die Ecken werden
+        eckig. Ein Kasten mit Luft ringsum sieht auf einem Telefon aus wie ein
+        Fenster in einer Seite; ein Band sieht aus wie der Kopf der App.
+      */}
       <header
-        className="tile mb-5 gap-0"
+        className="tile mb-4 gap-0 max-sm:-mx-5 max-sm:-mt-6 max-sm:rounded-none max-sm:px-5 max-sm:pt-7"
         style={{ '--tile-color': accent } as CSSProperties}
       >
         <div className="flex items-start gap-2">
@@ -94,7 +101,7 @@ export function ListPage() {
                 e.currentTarget.blur()
               }
             }}
-            className="-ml-1 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-2xl font-semibold tracking-tight outline-none placeholder:text-white/50 hover:bg-white/10 focus:bg-white/15"
+            className="-ml-1 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-screen font-bold tracking-tight outline-none placeholder:text-white/50 hover:bg-white/10 focus:bg-white/15"
             aria-label="Listenname"
           />
 
@@ -117,7 +124,7 @@ export function ListPage() {
           </HeaderAction>
         </div>
 
-        <p className="mt-1 px-0.5 text-sm opacity-80 tabular-nums">
+        <p className="mt-1 px-0.5 text-meta opacity-85 tabular-nums">
           {tasks.length === 0
             ? 'noch leer'
             : `${open} offen · ${done} von ${tasks.length} erledigt`}

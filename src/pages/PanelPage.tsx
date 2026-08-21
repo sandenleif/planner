@@ -344,7 +344,9 @@ export function PanelPage() {
 /** 0 = keine. Die Farben entsprechen denen im Hauptfenster. */
 const PRIORITIES: { value: number; label: string; title: string; className: string }[] = [
   { value: 0, label: '–', title: 'Keine Priorität', className: 'text-muted' },
-  { value: 1, label: '!', title: 'Niedrig', className: 'text-sky-600' },
+  // Kein Blau mehr: Das ist die Leitfarbe und darf nicht nebenbei "niedrige
+  // Prioritaet" bedeuten. Siehe PRIORITY_DOT in TaskRow.tsx.
+  { value: 1, label: '!', title: 'Niedrig', className: 'text-muted' },
   { value: 2, label: '!!', title: 'Mittel', className: 'text-amber-600' },
   { value: 3, label: '!!!', title: 'Hoch', className: 'text-red-600' },
 ]

@@ -240,13 +240,6 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
 
   return (
     <div className="flex flex-col">
-      <QuickAdd
-        accent={accent}
-        onSubmit={(task) =>
-          createTask.mutate({ ...task, position: keyAtEnd(allSiblingsOf(null)) })
-        }
-      />
-
       {isLoading && <p className="px-2 py-6 text-sm text-muted">Lädt …</p>}
 
       {!isLoading && rows.length === 0 && (
@@ -264,8 +257,12 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
         </div>
       )}
 
+      {/* Ohne Karte darum. Eine Karte grenzt ab — hier gibt es aber nichts
+          abzugrenzen: Die Aufgaben SIND die Seite. Getrennt wird durch eine
+          Haarlinie, die man sieht, wenn man hinsieht, und nicht, wenn man
+          liest. */}
       {rows.length > 0 && (
-        <div className="card px-2 py-2">
+        <div className="divide-y divide-ink/8">
           {rows.map((node) => (
             <Fragment key={node.id}>
               <TaskRow
@@ -303,6 +300,28 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
             : `${doneCount} erledigte einblenden`}
         </button>
       )}
+
+      {/*
+        Die Eingabe klebt am unteren Rand des Scrollbereichs statt über der
+        Liste zu stehen.
+
+        Auf dem Telefon ist das der Unterschied zwischen Daumen und Umgreifen:
+        Sie sitzt dort, wo gleich die Tastatur aufgeht, und nicht am anderen
+        Ende des Geräts. Auf dem Desktop stört es nicht — dort ist der Weg
+        dorthin ohnehin gleich weit.
+
+        Der Farbverlauf nach oben ist kein Schmuck: Ohne ihn schneidet die
+        Kante der Eingabefläche mitten durch die Zeile, die gerade darunter
+        durchscrollt.
+      */}
+      <div className="sticky bottom-0 z-10 -mx-5 mt-4 bg-gradient-to-t from-app from-70% to-transparent px-5 pb-2 pt-6 sm:-mx-8 sm:px-8">
+        <QuickAdd
+          accent={accent}
+          onSubmit={(task) =>
+            createTask.mutate({ ...task, position: keyAtEnd(allSiblingsOf(null)) })
+          }
+        />
+      </div>
 
       {actionsNode && (
         <TaskActionSheet

@@ -7,6 +7,11 @@ import { App } from './App'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { RepositoryProvider } from './data/RepositoryProvider'
 import { queryClient, queryPersister } from './app/queryClient'
+// Mitgeliefert statt von Google geholt: Die App soll offline dieselbe Schrift
+// zeigen wie online, und die CSP in tauri.conf.json laesst fremde
+// Schriftquellen nicht zu. Die Datei traegt unicode-range je Sprachraum, es
+// laedt also nur, was der Text wirklich braucht - fuer Deutsch 27 KB.
+import '@fontsource-variable/plus-jakarta-sans/wght.css'
 import './index.css'
 
 /**

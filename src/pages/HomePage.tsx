@@ -1,14 +1,24 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, CalendarCheck, Check, Inbox, Plus } from 'lucide-react'
+import { ArrowRight, Plus } from 'lucide-react'
 import clsx from 'clsx'
-import { useAllTasks, useLists, useUpdateTask } from '@/data/hooks'
-import type { List, Task } from '@/data/types'
-import { addDaysIso, formatDueDate, isOverdue, toIsoDate, todayIso } from '@/lib/date'
+import { useAllTasks, useLists } from '@/data/hooks'
+import type { List } from '@/data/types'
+import { addDaysIso, isOverdue, toIsoDate, todayIso } from '@/lib/date'
 import { sortByPosition } from '@/lib/ordering'
 import { listColor } from '@/features/lists/listColors'
 import { NewListDialog } from '@/features/lists/NewListDialog'
+import { FlatTaskRow } from '@/features/tasks/FlatTaskRow'
+
+/**
+ * Drei, nicht fünf und schon gar nicht alle.
+ *
+ * Die Übersicht soll die Frage „was jetzt" in einem Blick beantworten. Eine
+ * Vorschau, die scrollt, ist keine Vorschau mehr, sondern eine zweite
+ * Heute-Ansicht — und dann bräuchte es die erste nicht.
+ */
+const MAX_TODAY_PREVIEW = 3
 
 /**
  * Startseite: Kachelübersicht.
@@ -56,28 +66,114 @@ export function HomePage() {
     ).length
   }, [tasks, today])
 
+  // Steht schon in dueToday drin - überfällige Aufgaben sind ja auch heute
+  // fällig. Herausgezählt wird es, weil „7 fällig" und „2 davon überfällig"
+  // zwei verschiedene Dringlichkeiten sind.
+  const overdueCount = dueToday.filter((t) => isOverdue(t.dueAt)).length
+
   const sortedLists = sortByPosition(lists)
   const listById = new Map(lists.map((l) => [l.id, l]))
 
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 sm:py-10">
+      {/*
+        Die Zahl führt, nicht die Begrüßung.
+
+        Vorher stand „Guten Morgen" klein über dem Datum in 30 Pixeln — und
+        die Zahl, wegen der man die App überhaupt öffnet, weiter unten in 12.
+        Die Hierarchie stand auf dem Kopf: Das Datum weiß man, die Begrüßung
+        ändert nichts, die Zahl beantwortet die Frage.
+
+        Gruß und Datum bleiben, aber als Zeile darüber. Die Wärme kostet
+        nichts, solange sie nicht die Schlagzeile beansprucht.
+      */}
       <header className="mb-7">
-        <p className="text-sm text-muted">{greeting()}</p>
-        <h1 className="mt-0.5 text-3xl font-semibold tracking-tight">
+        <p className="text-label font-bold uppercase tracking-[0.1em] text-muted">
+          {greeting()} ·{' '}
           {new Intl.DateTimeFormat('de-DE', {
             weekday: 'long',
             day: 'numeric',
             month: 'long',
           }).format(new Date())}
-        </h1>
+        </p>
+
+        {dueToday.length > 0 ? (
+          <>
+            <div className="mt-2 flex items-baseline gap-3">
+              <span className="text-hero font-bold leading-none tracking-tight tabular-nums">
+                {dueToday.length}
+              </span>
+              <span className="text-base leading-tight">
+                {dueToday.length === 1 ? 'Aufgabe' : 'Aufgaben'}
+                <br />
+                heute fällig
+              </span>
+            </div>
+
+            {overdueCount > 0 && (
+              <p className="mt-2.5 text-sm font-semibold text-red-600 dark:text-red-400">
+                {overdueCount === 1
+                  ? '1 davon ist überfällig'
+                  : `${overdueCount} davon sind überfällig`}
+              </p>
+            )}
+          </>
+        ) : (
+          // „0 Aufgaben heute fällig" ist richtig und liest sich wie ein
+          // Fehler. Ein Satz sagt dasselbe und klingt nach Feierabend.
+          <p className="mt-2 text-screen font-bold tracking-tight">
+            Heute ist nichts fällig.
+          </p>
+        )}
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <TodayTile tasks={dueToday} listById={listById} />
-        <UpcomingTile count={upcomingCount} />
-      </div>
+      {/*
+        Ein Blick, keine Liste. Drei Zeilen beantworten „was jetzt", alles
+        Weitere steht hinter „Heute".
 
-      <h2 className="mb-3 mt-8 text-xs font-semibold uppercase tracking-wider text-muted">
+        Vorher standen hier zwei große farbige Kacheln. Sie sahen wichtig aus
+        und waren es nicht: Die Farbe gehört den Listen, und wenn „Heute" und
+        „Demnächst" sie sich ausleihen, bedeutet sie unten in den Zeilen nichts
+        mehr. Es sind jetzt dieselben Zeilen wie überall — man lernt sie einmal.
+      */}
+      {dueToday.length > 0 && (
+        <section className="mb-2">
+          <h2 className="px-1 pb-1 text-label font-bold uppercase tracking-[0.1em] text-muted">
+            Als Nächstes
+          </h2>
+          <div className="-mx-3.5 divide-y divide-ink/8">
+            {dueToday.slice(0, MAX_TODAY_PREVIEW).map((task) => (
+              <FlatTaskRow key={task.id} task={task} list={listById.get(task.listId)} />
+            ))}
+          </div>
+          {dueToday.length > MAX_TODAY_PREVIEW && (
+            <Link
+              to="/heute"
+              className="mt-2 inline-block px-1 text-meta text-muted underline-offset-2 hover:text-ink hover:underline"
+            >
+              … und {dueToday.length - MAX_TODAY_PREVIEW} weitere
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* „Demnächst" als Zeile statt als Kachel: Es ist ein Hinweis auf etwas,
+          das noch nicht dran ist — und soll sich nicht so anfühlen, als wäre
+          es dran. */}
+      {upcomingCount > 0 && (
+        <Link
+          to="/demnaechst"
+          className="mt-4 flex items-center gap-2 px-1 text-sm text-muted transition-colors hover:text-ink"
+        >
+          <span>
+            <span className="font-semibold tabular-nums text-ink">{upcomingCount}</span>{' '}
+            {upcomingCount === 1 ? 'Aufgabe' : 'Aufgaben'} in den nächsten 7 Tagen
+          </span>
+          <ArrowRight size={15} className="shrink-0" />
+        </Link>
+      )}
+
+      <h2 className="mb-3 mt-8 px-1 text-label font-bold uppercase tracking-[0.1em] text-muted">
         Listen
       </h2>
 
@@ -161,115 +257,6 @@ function ListTile({
         )}
       </div>
     </Link>
-  )
-}
-
-const MAX_TODAY_PREVIEW = 5
-
-function TodayTile({
-  tasks,
-  listById,
-}: {
-  tasks: Task[]
-  listById: Map<string, List>
-}) {
-  const overdue = tasks.filter((t) => isOverdue(t.dueAt)).length
-  const preview = tasks.slice(0, MAX_TODAY_PREVIEW)
-
-  return (
-    <section
-      className="tile"
-      style={{ '--tile-color': 'oklch(0.37 0.09 152)' } as CSSProperties}
-    >
-      <div className="flex items-baseline justify-between gap-4">
-        <Link to="/heute" className="flex items-center gap-2 text-lg font-semibold hover:underline">
-          <CalendarCheck size={18} />
-          Heute fällig
-        </Link>
-        <span className="text-sm opacity-80 tabular-nums">
-          {tasks.length === 0
-            ? 'nichts offen'
-            : `${tasks.length} ${tasks.length === 1 ? 'Aufgabe' : 'Aufgaben'}`}
-          {overdue > 0 && ` · ${overdue} überfällig`}
-        </span>
-      </div>
-
-      {tasks.length === 0 ? (
-        <p className="mt-3 text-sm opacity-75">
-          Nichts fällig. Auch das ist ein Ergebnis.
-        </p>
-      ) : (
-        <ul className="mt-3 flex flex-col">
-          {preview.map((task) => (
-            <TodayItem key={task.id} task={task} list={listById.get(task.listId)} />
-          ))}
-        </ul>
-      )}
-
-      {tasks.length > MAX_TODAY_PREVIEW && (
-        <Link to="/heute" className="mt-2 text-xs underline opacity-80 hover:opacity-100">
-          … und {tasks.length - MAX_TODAY_PREVIEW} weitere anzeigen
-        </Link>
-      )}
-    </section>
-  )
-}
-
-function UpcomingTile({ count }: { count: number }) {
-  return (
-    <Link
-      to="/demnaechst"
-      className="tile justify-between"
-      style={{ '--tile-color': '#2D6396' } as CSSProperties}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Inbox size={18} />
-          Demnächst
-        </h2>
-        <ArrowRight size={17} className="mt-1 shrink-0 opacity-50" />
-      </div>
-
-      <div className="mt-4">
-        <span className="text-3xl font-semibold tabular-nums">{count}</span>
-        <span className="ml-1.5 text-sm opacity-80">
-          {count === 1 ? 'Aufgabe' : 'Aufgaben'}
-        </span>
-        <p className="mt-1 text-xs opacity-70">in den nächsten 7 Tagen</p>
-      </div>
-    </Link>
-  )
-}
-
-function TodayItem({ task, list }: { task: Task; list: List | undefined }) {
-  // Der Hook braucht die listId - deshalb ist jede Zeile eine eigene
-  // Komponente statt eines Fragments in der Schleife.
-  const updateTask = useUpdateTask(task.listId)
-
-  return (
-    <li className="group -mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10">
-      <button
-        onClick={() => updateTask.mutate({ id: task.id, patch: { done: true } })}
-        className="tap-target flex size-[18px] shrink-0 items-center justify-center rounded-md border-2 border-white/65 transition-colors hover:border-white hover:bg-white/25"
-        aria-label={`„${task.title}“ als erledigt markieren`}
-      >
-        <Check
-          size={12}
-          strokeWidth={3}
-          className="opacity-0 transition-opacity group-hover:opacity-70"
-        />
-      </button>
-
-      <span className="min-w-0 flex-1 truncate text-sm">{task.title}</span>
-
-      {list && <span className="shrink-0 text-xs opacity-65">{list.name}</span>}
-
-      {task.dueAt && isOverdue(task.dueAt) && (
-        <span className="shrink-0 rounded bg-white/20 px-1.5 py-0.5 text-[11px] font-medium">
-          {formatDueDate(task.dueAt, task.allDay)}
-        </span>
-      )}
-    </li>
   )
 }
 

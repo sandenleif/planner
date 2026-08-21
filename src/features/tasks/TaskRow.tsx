@@ -5,8 +5,6 @@ import {
   ChevronRight,
   CornerDownRight,
   Flag,
-  MoreHorizontal,
-  Repeat,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
@@ -14,13 +12,22 @@ import clsx from 'clsx'
 import type { TaskNode } from '@/data/types'
 import { RECURRENCE_LABEL } from '@/data/recurrence'
 import { subtreeProgress } from '@/data/tree'
+import { formatDueDate, isOverdue } from '@/lib/date'
 import { isTouchPrimary } from '@/lib/platform'
 import { DueBadge } from './DueBadge'
 
-const PRIORITY_STYLE: Record<number, string> = {
-  1: 'text-sky-600',
-  2: 'text-amber-600',
-  3: 'text-red-600',
+/**
+ * Der Prioritätspunkt vor dem Titel — Nachfolger des Fähnchens am Zeilenende.
+ *
+ * Ein Punkt vorne wird beim Lesen mitgenommen; ein Symbol hinten muss gesucht
+ * werden. „Niedrig" bekommt bewusst einen eigenen, stillen Ton statt gar
+ * nichts: Sonst wäre eine ausdrücklich als niedrig eingestufte Aufgabe von
+ * einer ohne jede Angabe nicht zu unterscheiden.
+ */
+const PRIORITY_DOT: Record<number, string> = {
+  1: 'bg-muted/55',
+  2: 'bg-amber-600',
+  3: 'bg-red-600',
 }
 
 const PRIORITY_LABEL: Record<number, string> = {
@@ -43,12 +50,29 @@ export interface TaskRowActions {
   /** Verschiebt die Aufgabe unter ihren Geschwistern. -1 = hoch, 1 = runter. */
   onMove(node: TaskNode, direction: -1 | 1): void
   /**
-   * Oeffnet das Aktionsblatt - der Weg zu allem oben, wenn kein Zeiger und
-   * keine Tastatur da sind. Siehe TaskActionSheet.
+   * Oeffnet das Aktionsblatt - der Weg zu allem, wenn kein Zeiger und keine
+   * Tastatur da sind. Siehe TaskActionSheet.
    */
   onOpenActions(node: TaskNode): void
 }
 
+/**
+ * Eine Aufgabe.
+ *
+ * Zwei Zeilen statt einer: Der Titel bekommt die volle Breite, alles Weitere
+ * steht darunter als ein Satz in einer Stimme. Vorher standen bis zu neun
+ * Elemente nebeneinander — Dreieck, Haken, Titel, Notizpunkt, Fortschritt,
+ * Datum, Wiederholung, Priorität, Menü —, und auf einem 360 Pixel breiten
+ * Schirm blieb für den Titel der Rest.
+ *
+ * Der Unterschied zwischen Maus und Daumen liegt nur im Titel selbst:
+ *
+ * - Mit Maus ist er ein Eingabefeld. Tab rückt ein, Enter legt die nächste
+ *   Aufgabe an, Alt+Pfeil verschiebt. Das ist schnell und soll bleiben.
+ * - Mit Daumen ist er ein Knopf, der das Aktionsblatt öffnet. Ein Feld, in
+ *   dem man mit ausgefahrener Tastatur in einer Liste tippt, ist der
+ *   umständlichere Weg zu demselben Ziel.
+ */
 export function TaskRow({
   node,
   collapsed,
@@ -83,6 +107,7 @@ export function TaskRow({
 
   const progress = subtreeProgress(node)
   const hasChildren = node.children.length > 0
+  const overdue = !node.done && isOverdue(node.dueAt)
 
   const commit = () => {
     const trimmed = draft.trim()
@@ -125,21 +150,51 @@ export function TaskRow({
     }
   }
 
+  /**
+   * Die zweite Zeile.
+   *
+   * Nur vorhanden, wenn es etwas zu sagen gibt — eine erledigte Aufgabe ohne
+   * Termin bleibt einzeilig. Eine dauerhaft leere zweite Zeile wäre nichts als
+   * Luft zwischen den Aufgaben.
+   */
+  const meta: ReactNode[] = []
+
+  if (node.dueAt) {
+    meta.push(
+      <span key="due" className={clsx(overdue && 'font-semibold text-red-600 dark:text-red-400')}>
+        {formatDueDate(node.dueAt, node.allDay)}
+      </span>,
+    )
+  }
+  if (hasChildren) {
+    meta.push(
+      <span key="progress" className="tabular-nums">
+        {progress.done} von {progress.total}
+      </span>,
+    )
+  }
+  if (node.recurrence) {
+    meta.push(<span key="rec">{RECURRENCE_LABEL[node.recurrence].toLowerCase()}</span>)
+  }
+  if (node.notes) {
+    meta.push(<span key="notes">Notiz</span>)
+  }
+
   return (
     <div
-      className="group relative flex items-center gap-2 rounded-xl py-1.5 pr-1.5 transition-colors hover:bg-hover"
+      className={clsx(
+        'group relative flex items-start gap-3 rounded-xl py-2.5 pr-1.5 transition-colors',
+        !isTouchPrimary && 'hover:bg-hover',
+      )}
       style={{ paddingLeft: `${node.depth * 1.5 + 0.5}rem` }}
     >
-      {/* Senkrechte Linie je Verschachtelungsebene. Ohne sie verliert man ab
-          der zweiten Ebene den Überblick, was zu wem gehört. */}
+      {/* Senkrechte Spur je Verschachtelungsebene. Sie ersetzt die Frage
+          „wo fängt das an, wozu das hier gehört" durch eine Linie. */}
       {node.depth > 0 && (
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 w-px opacity-25"
-          style={{
-            left: `${(node.depth - 1) * 1.5 + 1.25}rem`,
-            backgroundColor: accent,
-          }}
+          className="pointer-events-none absolute inset-y-1 w-0.5 rounded-full bg-ink/12"
+          style={{ left: `${(node.depth - 1) * 1.5 + 1.1875}rem` }}
         />
       )}
 
@@ -149,7 +204,7 @@ export function TaskRow({
           // Auf Touch grosszuegiger gepolstert statt mit .tap-target: Das
           // Dreieck steht direkt neben dem Haken, und zwei unsichtbare
           // Flaechen nebeneinander wuerden sich ueberlappen.
-          'shrink-0 rounded p-0.5 text-muted transition-transform [@media(pointer:coarse)]:p-2',
+          'mt-px shrink-0 rounded p-0.5 text-muted transition-transform [@media(pointer:coarse)]:p-1.5',
           !hasChildren && 'invisible',
           !collapsed && 'rotate-90',
         )}
@@ -162,14 +217,10 @@ export function TaskRow({
       <button
         onClick={() => actions.onToggleDone(node)}
         className={clsx(
-          'tap-target flex size-5 shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
-          node.done ? 'border-transparent text-white' : 'border-muted/45 hover:border-current',
+          'tap-target mt-px flex size-[21px] shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
+          node.done ? 'border-transparent text-white' : 'border-muted/50 hover:border-current',
         )}
-        style={
-          node.done
-            ? { backgroundColor: accent }
-            : { color: accent }
-        }
+        style={node.done ? { backgroundColor: accent } : { color: accent }}
         // Der Titel gehoert ins Label: sonst hoert ein Screenreader-Nutzer
         // in einer Liste mit zwanzig Aufgaben zwanzig Mal denselben Satz.
         aria-label={
@@ -182,83 +233,70 @@ export function TaskRow({
         {node.done && <Check size={13} strokeWidth={3.5} />}
       </button>
 
-      <input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={onKeyDown}
-        className={clsx(
-          'min-w-0 flex-1 bg-transparent px-0.5 py-0.5 text-[0.9375rem] outline-none',
-          node.done && 'text-muted line-through decoration-muted/60',
+      <div className="min-w-0 flex-1">
+        {isTouchPrimary ? (
+          <button
+            onClick={() => actions.onOpenActions(node)}
+            className={clsx(
+              'flex w-full items-baseline gap-0 text-left text-task leading-snug',
+              node.done && 'text-muted line-through decoration-muted/55',
+            )}
+          >
+            {node.priority ? (
+              <span
+                className={clsx(
+                  'mr-2 size-1.5 shrink-0 translate-y-[-2px] rounded-full',
+                  PRIORITY_DOT[node.priority],
+                )}
+                aria-label={`Priorität ${PRIORITY_LABEL[node.priority]}`}
+              />
+            ) : null}
+            <span className="min-w-0">{node.title || 'Ohne Titel'}</span>
+          </button>
+        ) : (
+          <div className="flex items-baseline">
+            {node.priority ? (
+              <span
+                className={clsx(
+                  'mr-2 size-1.5 shrink-0 translate-y-[-2px] rounded-full',
+                  PRIORITY_DOT[node.priority],
+                )}
+                aria-label={`Priorität ${PRIORITY_LABEL[node.priority]}`}
+              />
+            ) : null}
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={onKeyDown}
+              className={clsx(
+                'min-w-0 flex-1 bg-transparent py-0 text-task leading-snug outline-none',
+                node.done && 'text-muted line-through decoration-muted/55',
+              )}
+              aria-label="Aufgabentitel"
+            />
+          </div>
         )}
-        aria-label="Aufgabentitel"
-      />
 
-      {node.notes && (
-        <span
-          className="size-1.5 shrink-0 rounded-full bg-muted/50"
-          title="Hat Notizen"
-          aria-label="Hat Notizen"
-        />
-      )}
-
-      {hasChildren && (
-        <span className="shrink-0 rounded-md bg-sunken px-1.5 py-0.5 text-[11px] tabular-nums text-muted">
-          {progress.done}/{progress.total}
-        </span>
-      )}
-
-      {node.dueAt && (
-        <DueBadge
-          dueAt={node.dueAt}
-          allDay={node.allDay}
-          done={node.done}
-          onChange={(value) => actions.onSetDue(node, value)}
-        />
-      )}
-
-      {node.recurrence && (
-        <span
-          className="flex shrink-0 items-center gap-1 rounded-md bg-sunken px-1.5 py-0.5 text-[11px] font-medium text-muted"
-          title={`Wiederholt sich ${RECURRENCE_LABEL[node.recurrence].toLowerCase()}`}
-        >
-          <Repeat size={11} />
-        </span>
-      )}
-
-      {node.priority ? (
-        <button
-          onClick={() => actions.onCyclePriority(node)}
-          className={clsx('shrink-0 rounded p-1', PRIORITY_STYLE[node.priority])}
-          aria-label={`Priorität ${PRIORITY_LABEL[node.priority]} — ändern`}
-          title={`Priorität: ${PRIORITY_LABEL[node.priority]}`}
-        >
-          <Flag size={13} fill="currentColor" />
-        </button>
-      ) : null}
+        {meta.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-meta text-muted">
+            {meta.map((part, index) => (
+              <span key={index} className="flex items-center gap-1.5">
+                {index > 0 && <span className="opacity-40">·</span>}
+                {part}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/*
-        Zwei Wege zu denselben Befehlen, je nach Eingabegeraet.
-
-        Mit Maus: die Symbolreihe, die beim Ueberfahren erscheint. Sie ist
-        schnell, weil der Zeiger ohnehin schon in der Zeile steht, und sie
-        stoert nicht, weil sie sonst unsichtbar ist.
-
-        Mit Daumen: ein einzelner Knopf, der das Aktionsblatt oeffnet. Die
-        Symbolreihe funktionierte hier gleich doppelt nicht - es gibt kein
-        Ueberfahren, sie stand also dauerhaft da und nahm dem Titel den Platz;
-        und mit 26 Pixeln war jedes Symbol zu klein zum sicheren Treffen.
+        Nur mit Zeiger. Auf Touch führt derselbe Weg über das Aktionsblatt —
+        die Symbolreihe stand dort dauerhaft im Bild, weil es kein Überfahren
+        gibt, und war mit 26 Pixeln zu klein zum sicheren Treffen.
       */}
-      {isTouchPrimary ? (
-        <button
-          onClick={() => actions.onOpenActions(node)}
-          className="shrink-0 rounded-lg p-2 text-muted transition-colors hover:bg-sunken hover:text-ink"
-          aria-label={`Aktionen für „${node.title || 'Aufgabe ohne Titel'}“`}
-        >
-          <MoreHorizontal size={18} />
-        </button>
-      ) : (
+      {!isTouchPrimary && (
         <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           {!node.dueAt && (
             <DueBadge
@@ -268,11 +306,9 @@ export function TaskRow({
               onChange={(value) => actions.onSetDue(node, value)}
             />
           )}
-          {!node.priority && (
-            <IconAction label="Priorität setzen" onClick={() => actions.onCyclePriority(node)}>
-              <Flag size={13} />
-            </IconAction>
-          )}
+          <IconAction label="Priorität ändern" onClick={() => actions.onCyclePriority(node)}>
+            <Flag size={13} />
+          </IconAction>
           <IconAction
             label={detailsOpen ? 'Details schließen' : 'Details öffnen'}
             onClick={() => actions.onToggleDetails(node)}

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { TaskNode } from '@/data/types'
+import { RECURRENCE_LABEL } from '@/data/recurrence'
 import { dueFromDateInput, formatDueDate, toIsoDate } from '@/lib/date'
 import { Dialog } from '@/ui/Dialog'
 import type { TaskRowActions } from './TaskRow'
@@ -79,24 +80,15 @@ export function TaskActionSheet({
       title={node.title.trim() || 'Aufgabe ohne Titel'}
       description={node.done ? 'Erledigt' : undefined}
     >
-      <div className="-mx-2 flex flex-col">
-        <Row
-          icon={<SlidersHorizontal size={18} />}
-          label={detailsOpen ? 'Details schließen' : 'Details öffnen'}
-          onClick={() => {
-            actions.onToggleDetails(node)
-            onClose()
-          }}
-        />
+      {/*
+        Drei Blöcke in dieser Reihenfolge: was die Aufgabe IST, wo sie STEHT,
+        und ganz unten mit Abstand das, was sie beendet. Löschen zwischen
+        „Einrücken" und „Nach unten" wäre eine Falle für den Daumen.
 
-        <Row
-          icon={<CornerDownRight size={18} />}
-          label="Unterpunkt hinzufügen"
-          onClick={() => {
-            actions.onAddSubtask(node)
-            onClose()
-          }}
-        />
+        Rechts steht jeweils der aktuelle Zustand. „Fällig — Gestern" sagt
+        beides in einer Zeile: was es ist und dass man es ändern kann.
+      */}
+      <div className="-mx-2 flex flex-col">
 
         {/* Bleibt offen: Wer die Fälligkeit setzt, ändert oft gleich noch die
             Priorität. Das Blatt zweimal aufzuziehen wäre unnötige Arbeit.
@@ -110,8 +102,10 @@ export function TaskActionSheet({
         <span className="relative flex">
           <Row
             icon={<CalendarDays size={18} />}
-            label={node.dueAt ? 'Fällig ändern' : 'Fällig setzen'}
-            hint={node.dueAt ? formatDueDate(node.dueAt, node.allDay) : undefined}
+            label="Fällig"
+            // Auch wenn nichts gesetzt ist, steht rechts etwas. Eine leere
+            // rechte Spalte sieht aus wie ein Wert, der noch lädt.
+            hint={node.dueAt ? formatDueDate(node.dueAt, node.allDay) : 'kein Termin'}
             onClick={openDatePicker}
             grow
           />
@@ -133,12 +127,33 @@ export function TaskActionSheet({
           onClick={() => actions.onCyclePriority(node)}
         />
 
+        <Row
+          icon={<SlidersHorizontal size={18} />}
+          label={detailsOpen ? 'Details schließen' : 'Notiz und Wiederholung'}
+          hint={detailSummary(node)}
+          onClick={() => {
+            actions.onToggleDetails(node)
+            onClose()
+          }}
+        />
+
         <Separator />
 
         <Row
+          icon={<CornerDownRight size={18} />}
+          label="Unterpunkt hinzufügen"
+          onClick={() => {
+            actions.onAddSubtask(node)
+            onClose()
+          }}
+        />
+
+        {/* Was gerade nicht geht, bleibt sichtbar und sagt warum. Ein Punkt,
+            der einfach fehlt, lässt einen suchen, ob man ihn übersehen hat. */}
+        <Row
           icon={<IndentIncrease size={18} />}
           label="Einrücken"
-          hint="wird Unterpunkt darüber"
+          hint={abilities.indent ? 'unter die Aufgabe darüber' : 'nichts darüber'}
           disabled={!abilities.indent}
           onClick={() => actions.onIndent(node)}
         />
@@ -146,6 +161,7 @@ export function TaskActionSheet({
         <Row
           icon={<IndentDecrease size={18} />}
           label="Ausrücken"
+          hint={abilities.outdent ? undefined : 'schon ganz außen'}
           disabled={!abilities.outdent}
           onClick={() => actions.onOutdent(node)}
         />
@@ -153,6 +169,7 @@ export function TaskActionSheet({
         <Row
           icon={<ArrowUp size={18} />}
           label="Nach oben"
+          hint={abilities.up ? undefined : 'steht bereits oben'}
           disabled={!abilities.up}
           onClick={() => actions.onMove(node, -1)}
         />
@@ -160,6 +177,7 @@ export function TaskActionSheet({
         <Row
           icon={<ArrowDown size={18} />}
           label="Nach unten"
+          hint={abilities.down ? undefined : 'steht bereits unten'}
           disabled={!abilities.down}
           onClick={() => actions.onMove(node, 1)}
         />
@@ -223,4 +241,19 @@ function Row({
 
 function Separator() {
   return <span className="my-1.5 h-px bg-subtle" aria-hidden />
+}
+
+/**
+ * Was hinter „Details" steckt, ohne dass man es aufklappen muss.
+ *
+ * Notiz und Wiederholung sind die einzigen beiden Dinge dort. Sie hier zu
+ * nennen erspart in den meisten Fällen den Umweg — und wenn nichts gesetzt
+ * ist, sagt das Blatt das auch, statt schweigend auf einen leeren Bereich zu
+ * verweisen.
+ */
+function detailSummary(node: TaskNode): string {
+  const parts: string[] = []
+  if (node.notes) parts.push('Notiz')
+  if (node.recurrence) parts.push(RECURRENCE_LABEL[node.recurrence].toLowerCase())
+  return parts.length > 0 ? parts.join(' · ') : 'nichts gesetzt'
 }

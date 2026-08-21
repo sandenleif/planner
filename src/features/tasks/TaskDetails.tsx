@@ -7,7 +7,10 @@ import { RECURRENCE_OPTIONS } from '@/data/recurrence'
 
 const PRIORITIES: { value: number | null; label: string; className: string }[] = [
   { value: null, label: 'keine', className: 'text-muted' },
-  { value: 1, label: 'niedrig', className: 'text-sky-600' },
+  // Muss zu PRIORITY_DOT in TaskRow.tsx passen: still fuer niedrig, Bernstein
+  // fuer mittel, Rot fuer hoch. Blau faellt weg - das ist jetzt die Leitfarbe
+  // und darf nicht nebenbei "niedrige Prioritaet" bedeuten.
+  { value: 1, label: 'niedrig', className: 'text-muted' },
   { value: 2, label: 'mittel', className: 'text-amber-600' },
   { value: 3, label: 'hoch', className: 'text-red-600' },
 ]
