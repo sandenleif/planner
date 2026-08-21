@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { CalendarDays } from 'lucide-react'
 import clsx from 'clsx'
-import { formatDueDate, isOverdue, toIsoDate } from '@/lib/date'
+import { dueFromDateInput, formatDueDate, isOverdue, toIsoDate } from '@/lib/date'
 
 /**
  * Faelligkeit anzeigen und aendern - der Knopf mit dem Kalendersymbol.
@@ -55,12 +55,7 @@ export function DueBadge({
         ref={ref}
         type="date"
         value={dueAt ? toIsoDate(new Date(dueAt)) : ''}
-        onChange={(e) => {
-          const value = e.target.value
-          // Mittag statt Mitternacht: so kippt ein Ganztagstermin nicht durch
-          // Zeitzonenumrechnung auf den Vor- oder Folgetag.
-          onChange(value ? new Date(`${value}T12:00:00`).toISOString() : null)
-        }}
+        onChange={(e) => onChange(dueFromDateInput(e.target.value))}
         className="pointer-events-none absolute inset-0 size-full opacity-0"
         tabIndex={-1}
         aria-hidden

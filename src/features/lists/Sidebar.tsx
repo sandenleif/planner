@@ -31,40 +31,46 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav className="flex h-full flex-col gap-0.5 overflow-y-auto px-3 py-3">
-      <NavLink to="/" onClick={onNavigate} end className={({ isActive }) => navClass(isActive)}>
-        <Home size={16} className="shrink-0" />
-        <span className="flex-1 truncate">Übersicht</span>
-      </NavLink>
+      {/* Auf dem Telefon stehen diese drei unten in der Navigationsleiste.
+          Sie hier ein zweites Mal zu zeigen, machte die ausfahrbare Leiste zu
+          einer Kopie der Leiste darunter - und liesse die Listen, weswegen man
+          sie überhaupt aufzieht, nach unten rutschen. */}
+      <div className="flex flex-col gap-0.5 max-md:hidden">
+        <NavLink to="/" onClick={onNavigate} end className={({ isActive }) => navClass(isActive)}>
+          <Home size={16} className="shrink-0" />
+          <span className="flex-1 truncate">Übersicht</span>
+        </NavLink>
 
-      <NavLink to="/heute" onClick={onNavigate} className={({ isActive }) => navClass(isActive)}>
-        <CalendarCheck size={16} className="shrink-0" />
-        <span className="flex-1 truncate">Heute</span>
-        {dueToday > 0 && (
-          <span
-            className={clsx(
-              'shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
-              // Überfälliges soll auffallen, ohne dass man erst hinklickt.
-              overdue > 0 ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'text-muted',
-            )}
-          >
-            {dueToday}
-          </span>
-        )}
-      </NavLink>
+        <NavLink to="/heute" onClick={onNavigate} className={({ isActive }) => navClass(isActive)}>
+          <CalendarCheck size={16} className="shrink-0" />
+          <span className="flex-1 truncate">Heute</span>
+          {dueToday > 0 && (
+            <span
+              className={clsx(
+                'shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
+                // Überfälliges soll auffallen, ohne dass man erst hinklickt.
+                overdue > 0 ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'text-muted',
+              )}
+            >
+              {dueToday}
+            </span>
+          )}
+        </NavLink>
 
-      <NavLink
-        to="/demnaechst"
-        onClick={onNavigate}
-        className={({ isActive }) => navClass(isActive)}
-      >
-        <Inbox size={16} className="shrink-0" />
-        <span className="flex-1 truncate">Demnächst</span>
-        {dueWeek > 0 && (
-          <span className="shrink-0 text-xs tabular-nums text-muted">{dueWeek}</span>
-        )}
-      </NavLink>
+        <NavLink
+          to="/demnaechst"
+          onClick={onNavigate}
+          className={({ isActive }) => navClass(isActive)}
+        >
+          <Inbox size={16} className="shrink-0" />
+          <span className="flex-1 truncate">Demnächst</span>
+          {dueWeek > 0 && (
+            <span className="shrink-0 text-xs tabular-nums text-muted">{dueWeek}</span>
+          )}
+        </NavLink>
+      </div>
 
-      <div className="mt-5 flex items-center justify-between px-3 pb-1.5">
+      <div className="flex items-center justify-between px-3 pb-1.5 md:mt-5">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
           Listen
         </span>
@@ -98,7 +104,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
 function navClass(isActive: boolean) {
   return clsx(
-    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+    // py-3 auf dem Telefon: Damit ist die Zeile rund 44 Pixel hoch. Mit py-2
+    // waren es 36 - genug fuer einen Mauszeiger, zu wenig fuer einen Daumen.
+    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors max-md:py-3',
     isActive
       ? 'bg-hover font-medium text-ink'
       : 'text-muted hover:bg-hover hover:text-ink',

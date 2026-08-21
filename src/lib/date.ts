@@ -37,6 +37,24 @@ export function addDaysIso(value: IsoDate, days: number): IsoDate {
   return toIsoDate(fnsAddDays(fromIsoDate(value), days))
 }
 
+/**
+ * Wandelt den Wert eines <input type="date"> in eine Faelligkeit um.
+ *
+ * Mittag statt Mitternacht, und das ist der ganze Zweck dieser Funktion: Ein
+ * Ganztagstermin wird als UTC-Zeitstempel gespeichert. Auf Mitternacht gesetzt,
+ * kippt er beim Umrechnen in eine andere Zeitzone auf den Vor- oder Folgetag -
+ * westlich von Greenwich wird aus "5.12." zuverlaessig der 4. Um zwoelf Uhr
+ * mittags ist der Abstand zu beiden Tagesgrenzen so gross, dass keine reale
+ * Zeitzone darueber hinausreicht.
+ *
+ * Steht hier und nicht in der Komponente, weil zwei Stellen dieselbe Umrechnung
+ * brauchen: das Kalendersymbol in der Zeile und derselbe Punkt im
+ * Aktionsblatt auf dem Telefon.
+ */
+export function dueFromDateInput(value: string): string | null {
+  return value ? new Date(`${value}T12:00:00`).toISOString() : null
+}
+
 /** Die letzten `count` Tage, aeltester zuerst, endend bei `end` (Vorgabe heute). */
 export function lastDays(count: number, end: IsoDate = todayIso()): IsoDate[] {
   return Array.from({ length: count }, (_, i) => addDaysIso(end, i - count + 1))

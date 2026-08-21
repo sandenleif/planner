@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
-import { CheckCircle2, Menu, Search, Settings, WifiOff } from 'lucide-react'
+import { CheckCircle2, Search, Settings, WifiOff } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/auth/AuthProvider'
 import { SignInScreen } from '@/auth/SignInScreen'
 import { useGlobalRealtime } from '@/data/hooks'
 import { useRepository } from '@/data/RepositoryProvider'
 import { Sidebar } from '@/features/lists/Sidebar'
+import { BottomNav } from '@/features/nav/BottomNav'
 import { CommandPalette } from '@/features/search/CommandPalette'
 import { SettingsDialog } from '@/features/settings/SettingsDialog'
 import { AgendaPage } from '@/pages/AgendaPage'
@@ -103,6 +104,11 @@ function Shell() {
         className={clsx(
           'z-30 flex w-60 shrink-0 flex-col border-r border-subtle bg-panel',
           'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:transition-transform',
+          // Die Leiste ist auf dem Telefon `fixed` und misst sich damit am
+          // Sichtfenster, nicht am <body>. Dessen safe-area-Polster gilt fuer
+          // sie also nicht - ohne diese Zeile laege die Kopfzeile unter der
+          // Statusleiste und der Einstellungsknopf unter der Gestenleiste.
+          'max-md:pt-[env(safe-area-inset-top,0px)]',
           menuOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full',
         )}
       >
@@ -127,7 +133,10 @@ function Shell() {
           >
             <Search size={15} className="shrink-0" />
             <span className="flex-1 text-left">Suchen …</span>
-            <kbd className="shrink-0 rounded border border-subtle px-1 py-0.5 text-[10px]">
+            {/* Ein Tastenkürzel auf einem Telefon anzuzeigen, ist bestenfalls
+                Zierde und schlimmstenfalls ein Versprechen, das das Gerät
+                nicht halten kann. */}
+            <kbd className="shrink-0 rounded border border-subtle px-1 py-0.5 text-[10px] max-md:hidden">
               {modKeyLabel}+K
             </kbd>
           </button>
@@ -137,10 +146,10 @@ function Shell() {
           <Sidebar onNavigate={() => setMenuOpen(false)} />
         </div>
 
-        <div className="shrink-0 border-t border-subtle p-3">
+        <div className="shrink-0 border-t border-subtle p-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
           <button
             onClick={() => setSettingsOpen(true)}
-            className="btn-ghost w-full justify-start"
+            className="btn-ghost w-full justify-start max-md:py-3"
           >
             <Settings size={16} />
             Einstellungen
@@ -157,20 +166,14 @@ function Shell() {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Der Kopfbalken traegt auf schmalen Fenstern den Menue-Knopf und
-            dient auf dem Desktop als Ziehflaeche fuer das Fenster. */}
+        {/* Auf dem Desktop die Ziehflaeche fuer das Fenster, auf dem Telefon
+            nur noch die Suche. Der Menue-Knopf sass hier, solange das
+            Hamburger-Menue der einzige Weg zu den anderen Ansichten war -
+            jetzt steht die Navigation unten, in Daumenreichweite. */}
         <header
-          className="flex h-14 shrink-0 items-center gap-2 px-3 md:h-8"
+          className="flex h-11 shrink-0 items-center gap-2 px-3 md:h-8"
           data-tauri-drag-region
         >
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="btn-ghost px-2 md:hidden"
-            aria-label="Menü öffnen"
-          >
-            <Menu size={18} />
-          </button>
-
           <span className="flex-1" />
 
           <button
@@ -192,6 +195,8 @@ function Shell() {
             <Route path="*" element={<HomePage />} />
           </Routes>
         </main>
+
+        <BottomNav onOpenLists={() => setMenuOpen(true)} listsOpen={menuOpen} />
       </div>
 
       <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />

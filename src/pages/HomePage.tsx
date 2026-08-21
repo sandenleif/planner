@@ -250,7 +250,7 @@ function TodayItem({ task, list }: { task: Task; list: List | undefined }) {
     <li className="group -mx-2 flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10">
       <button
         onClick={() => updateTask.mutate({ id: task.id, patch: { done: true } })}
-        className="flex size-[18px] shrink-0 items-center justify-center rounded-md border-2 border-white/65 transition-colors hover:border-white hover:bg-white/25"
+        className="tap-target flex size-[18px] shrink-0 items-center justify-center rounded-md border-2 border-white/65 transition-colors hover:border-white hover:bg-white/25"
         aria-label={`„${task.title}“ als erledigt markieren`}
       >
         <Check

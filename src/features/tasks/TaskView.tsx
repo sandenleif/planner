@@ -8,9 +8,11 @@ import {
   useUpdateTask,
 } from '@/data/hooks'
 import { buildTaskTree, flattenTree, subtreeIds } from '@/data/tree'
-import type { Task } from '@/data/types'
+import type { Task, TaskNode } from '@/data/types'
 import { keyAtEnd, keyBetween, keyForIndex, sortByPosition } from '@/lib/ordering'
+import { isTouchPrimary } from '@/lib/platform'
 import { QuickAdd } from './QuickAdd'
+import { TaskActionSheet, type TaskAbilities } from './TaskActionSheet'
 import { TaskDetails } from './TaskDetails'
 import { TaskRow, type TaskRowActions } from './TaskRow'
 
@@ -32,6 +34,12 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const [showDone, setShowDone] = useState(false)
   const [detailsFor, setDetailsFor] = useState<string | null>(null)
+
+  // Nur die Kennung, nicht der Knoten selbst. Der Knoten unten wird bei jedem
+  // Rendern frisch herausgesucht - sonst zeigte das Blatt nach dem ersten
+  // Verschieben noch den Stand von davor und liesse "nach oben" anbieten,
+  // obwohl die Aufgabe schon oben steht.
+  const [actionsFor, setActionsFor] = useState<string | null>(null)
 
   const doneCount = tasks.filter((t) => t.done).length
 
@@ -172,6 +180,10 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
       setDetailsFor((current) => (current === node.id ? null : node.id))
     },
 
+    onOpenActions: (node) => {
+      setActionsFor(node.id)
+    },
+
     onMove: (node, direction) => {
       // Verschoben wird innerhalb der SICHTBAREN Geschwister, gerechnet wird
       // gegen alle - sonst springt die Zeile ueber eine ausgeblendete hinweg
@@ -200,6 +212,32 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
     },
   }
 
+  // Die offene Zeile des Aktionsblatts, bei jedem Rendern neu gesucht. Ist sie
+  // verschwunden - geloescht, oder unter einem zugeklappten Elternteil - gibt
+  // es nichts mehr anzubieten, und das Blatt schliesst sich von selbst.
+  const actionsNode = actionsFor ? (rows.find((row) => row.id === actionsFor) ?? null) : null
+
+  /**
+   * Was mit dieser Zeile gerade geht.
+   *
+   * Gerechnet wird gegen die SICHTBAREN Geschwister, aus demselben Grund wie
+   * bei den Tastaturbefehlen weiter oben: Ein "nach oben", das die Aufgabe
+   * hinter eine ausgeblendete erledigte schiebt, sieht aus, als sei nichts
+   * passiert.
+   */
+  const abilitiesOf = (node: TaskNode): TaskAbilities => {
+    const siblings = visibleSiblingsOf(node.parentId)
+    const index = siblings.findIndex((task) => task.id === node.id)
+
+    return {
+      // Einruecken heisst: unter den Vorgaenger. Ohne Vorgaenger geht es nicht.
+      indent: index > 0,
+      outdent: node.parentId !== null,
+      up: index > 0,
+      down: index >= 0 && index < siblings.length - 1,
+    }
+  }
+
   return (
     <div className="flex flex-col">
       <QuickAdd
@@ -216,9 +254,12 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
           <p className="text-sm text-muted">
             {doneCount > 0 ? 'Alles erledigt.' : 'Noch nichts hier.'}
           </p>
+          {/* Einem Telefon von Tab und Alt+Pfeil zu erzählen, hilft niemandem.
+              Dort führt derselbe Weg über das Aktionsblatt der Zeile. */}
           <p className="mt-1.5 text-xs text-muted">
-            Tab rückt ein, Shift+Tab wieder aus, Enter legt die nächste Aufgabe an,
-            Alt+↑/↓ verschiebt.
+            {isTouchPrimary
+              ? 'Über ⋯ am Zeilenende gibt es Unterpunkte, Fälligkeit, Priorität und die Reihenfolge.'
+              : 'Tab rückt ein, Shift+Tab wieder aus, Enter legt die nächste Aufgabe an, Alt+↑/↓ verschiebt.'}
           </p>
         </div>
       )}
@@ -261,6 +302,16 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
             ? `${doneCount} erledigte ausblenden`
             : `${doneCount} erledigte einblenden`}
         </button>
+      )}
+
+      {actionsNode && (
+        <TaskActionSheet
+          node={actionsNode}
+          abilities={abilitiesOf(actionsNode)}
+          detailsOpen={detailsFor === actionsNode.id}
+          actions={actions}
+          onClose={() => setActionsFor(null)}
+        />
       )}
     </div>
   )

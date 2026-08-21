@@ -181,6 +181,34 @@
     @apply border border-subtle text-ink hover:bg-hover;
   }
 
+  /*
+   * Vergroessert die Trefferflaeche eines kleinen Bedienelements, ohne sein
+   * Aussehen anzutasten.
+   *
+   * Ein Haken von 20 Pixeln sieht in einer Aufgabenzeile richtig aus - er ist
+   * nur zu klein zum Treffen. Android nennt 48 Pixel als Untergrenze. Ihn
+   * einfach groesser zu machen loeste das eine Problem und schuefe ein
+   * zweites: Die Zeile saehe aus wie ein Formular.
+   *
+   * Das unsichtbare ::before nimmt die Tipper entgegen und liegt ausserhalb
+   * des Flusses - die Zeile bleibt exakt so hoch wie vorher. Nur auf
+   * Zeigegeraeten ohne Praezision; mit der Maus trifft man auch 20 Pixel.
+   */
+  @media (pointer: coarse) {
+    .tap-target {
+      position: relative;
+    }
+
+    .tap-target::before {
+      content: '';
+      position: absolute;
+      /* 8px ringsum. Mehr waere besser zu treffen und wuerde anfangen, die
+         Flaeche des Nachbarn zu ueberdecken - dann traefe man mitunter den
+         Haken, wo man das Dreieck gemeint hat. */
+      inset: -0.5rem;
+    }
+  }
+
   .field {
     @apply w-full rounded-xl border border-subtle bg-panel px-3.5 py-2.5 text-sm
            text-ink placeholder:text-muted focus:border-accent-500
@@ -190,6 +218,52 @@
   .card {
     @apply rounded-[var(--radius-card)] border border-subtle bg-panel;
     box-shadow: var(--shadow-card);
+  }
+
+  /*
+   * Schwebende Flaeche fuer Dialoge.
+   *
+   * Wie .card, aber mit dem tieferen Schatten: Eine Karte liegt auf der Seite,
+   * ein Dialog darueber. Ohne den Unterschied wirkt ein Dialog wie ein Stueck
+   * Seite, das versehentlich in der Mitte klebt.
+   *
+   * Diese Klasse stand eine Weile im Markup, ohne dass es sie gab - ein
+   * <dialog> ohne eigene Flaeche faellt naemlich nicht auf: Der Browser malt
+   * ihm die Systemfarbe `Canvas` darunter, und die ist im hellen Modus weiss
+   * und im dunklen dunkel. Es sah also jedes Mal "irgendwie richtig" aus und
+   * war doch nie die Cremefarbe der App - mit scharfen Ecken statt runden.
+   */
+  .panel {
+    @apply rounded-[var(--radius-card)] border border-subtle bg-panel;
+    box-shadow: var(--shadow-tile);
+  }
+
+  /*
+   * Bottom Sheet: Auf schmalen Bildschirmen faehrt der Dialog von unten
+   * herein statt in der Mitte aufzublitzen.
+   *
+   * Nur die Einblendung ist bewegt, nicht das Schliessen. Ein <dialog>
+   * verschwindet mit display:none, und das laesst sich erst mit
+   * `transition-behavior: allow-discrete` und @starting-style animieren -
+   * beides zu neu, um sich darauf zu verlassen. Eine halbe Bewegung ist hier
+   * besser als eine, die auf aelteren WebViews gar nicht laeuft.
+   */
+  @media (width < 48rem) {
+    .sheet[open] {
+      animation: sheet-in 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet[open] {
+      animation: none;
+    }
   }
 
   /*

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CornerDownRight,
   Flag,
+  MoreHorizontal,
   Repeat,
   SlidersHorizontal,
   Trash2,
@@ -13,6 +14,7 @@ import clsx from 'clsx'
 import type { TaskNode } from '@/data/types'
 import { RECURRENCE_LABEL } from '@/data/recurrence'
 import { subtreeProgress } from '@/data/tree'
+import { isTouchPrimary } from '@/lib/platform'
 import { DueBadge } from './DueBadge'
 
 const PRIORITY_STYLE: Record<number, string> = {
@@ -40,6 +42,11 @@ export interface TaskRowActions {
   onToggleDetails(node: TaskNode): void
   /** Verschiebt die Aufgabe unter ihren Geschwistern. -1 = hoch, 1 = runter. */
   onMove(node: TaskNode, direction: -1 | 1): void
+  /**
+   * Oeffnet das Aktionsblatt - der Weg zu allem oben, wenn kein Zeiger und
+   * keine Tastatur da sind. Siehe TaskActionSheet.
+   */
+  onOpenActions(node: TaskNode): void
 }
 
 export function TaskRow({
@@ -139,7 +146,10 @@ export function TaskRow({
       <button
         onClick={onToggleCollapse}
         className={clsx(
-          'shrink-0 rounded p-0.5 text-muted transition-transform',
+          // Auf Touch grosszuegiger gepolstert statt mit .tap-target: Das
+          // Dreieck steht direkt neben dem Haken, und zwei unsichtbare
+          // Flaechen nebeneinander wuerden sich ueberlappen.
+          'shrink-0 rounded p-0.5 text-muted transition-transform [@media(pointer:coarse)]:p-2',
           !hasChildren && 'invisible',
           !collapsed && 'rotate-90',
         )}
@@ -152,7 +162,7 @@ export function TaskRow({
       <button
         onClick={() => actions.onToggleDone(node)}
         className={clsx(
-          'flex size-5 shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
+          'tap-target flex size-5 shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
           node.done ? 'border-transparent text-white' : 'border-muted/45 hover:border-current',
         )}
         style={
@@ -228,40 +238,60 @@ export function TaskRow({
         </button>
       ) : null}
 
-      {/* Auf Touch-Geraeten gibt es kein Hover - dort bleiben die Aktionen
-          dauerhaft schwach sichtbar. */}
-      <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-55">
-        {!node.dueAt && (
-          <DueBadge
-            dueAt={null}
-            allDay
-            done={node.done}
-            onChange={(value) => actions.onSetDue(node, value)}
-          />
-        )}
-        {!node.priority && (
-          <IconAction label="Priorität setzen" onClick={() => actions.onCyclePriority(node)}>
-            <Flag size={13} />
+      {/*
+        Zwei Wege zu denselben Befehlen, je nach Eingabegeraet.
+
+        Mit Maus: die Symbolreihe, die beim Ueberfahren erscheint. Sie ist
+        schnell, weil der Zeiger ohnehin schon in der Zeile steht, und sie
+        stoert nicht, weil sie sonst unsichtbar ist.
+
+        Mit Daumen: ein einzelner Knopf, der das Aktionsblatt oeffnet. Die
+        Symbolreihe funktionierte hier gleich doppelt nicht - es gibt kein
+        Ueberfahren, sie stand also dauerhaft da und nahm dem Titel den Platz;
+        und mit 26 Pixeln war jedes Symbol zu klein zum sicheren Treffen.
+      */}
+      {isTouchPrimary ? (
+        <button
+          onClick={() => actions.onOpenActions(node)}
+          className="shrink-0 rounded-lg p-2 text-muted transition-colors hover:bg-sunken hover:text-ink"
+          aria-label={`Aktionen für „${node.title || 'Aufgabe ohne Titel'}“`}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+      ) : (
+        <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          {!node.dueAt && (
+            <DueBadge
+              dueAt={null}
+              allDay
+              done={node.done}
+              onChange={(value) => actions.onSetDue(node, value)}
+            />
+          )}
+          {!node.priority && (
+            <IconAction label="Priorität setzen" onClick={() => actions.onCyclePriority(node)}>
+              <Flag size={13} />
+            </IconAction>
+          )}
+          <IconAction
+            label={detailsOpen ? 'Details schließen' : 'Details öffnen'}
+            onClick={() => actions.onToggleDetails(node)}
+            className={clsx(detailsOpen && 'bg-sunken text-ink')}
+          >
+            <SlidersHorizontal size={13} />
           </IconAction>
-        )}
-        <IconAction
-          label={detailsOpen ? 'Details schließen' : 'Details öffnen'}
-          onClick={() => actions.onToggleDetails(node)}
-          className={clsx(detailsOpen && 'bg-sunken text-ink')}
-        >
-          <SlidersHorizontal size={13} />
-        </IconAction>
-        <IconAction label="Unterpunkt hinzufügen" onClick={() => actions.onAddSubtask(node)}>
-          <CornerDownRight size={13} />
-        </IconAction>
-        <IconAction
-          label="Löschen"
-          onClick={() => actions.onDelete(node)}
-          className="hover:text-red-600"
-        >
-          <Trash2 size={13} />
-        </IconAction>
-      </div>
+          <IconAction label="Unterpunkt hinzufügen" onClick={() => actions.onAddSubtask(node)}>
+            <CornerDownRight size={13} />
+          </IconAction>
+          <IconAction
+            label="Löschen"
+            onClick={() => actions.onDelete(node)}
+            className="hover:text-red-600"
+          >
+            <Trash2 size={13} />
+          </IconAction>
+        </div>
+      )}
     </div>
   )
 }

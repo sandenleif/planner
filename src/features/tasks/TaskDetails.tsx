@@ -86,7 +86,9 @@ export function TaskDetails({
                 key={String(option.value)}
                 onClick={() => onPatch({ priority: option.value })}
                 className={clsx(
-                  'flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors',
+                  // py-2.5 auf dem Telefon: sonst sind die vier Knoepfe nur
+                  // 28 Pixel hoch und liegen dicht nebeneinander.
+                  'flex-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors max-md:py-2.5',
                   task.priority === option.value
                     ? `bg-panel ${option.className} shadow-sm`
                     : 'text-muted hover:bg-hover',

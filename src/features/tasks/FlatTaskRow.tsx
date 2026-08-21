@@ -40,7 +40,7 @@ export function FlatTaskRow({
       <button
         onClick={() => toggleDone.mutate(task)}
         className={clsx(
-          'flex size-5 shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
+          'tap-target flex size-5 shrink-0 items-center justify-center rounded-[7px] border-2 transition-all',
           task.done ? 'border-transparent text-white' : 'border-muted/45 hover:border-current',
         )}
         style={task.done ? { backgroundColor: accent } : { color: accent }}

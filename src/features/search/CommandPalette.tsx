@@ -105,7 +105,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 px-4 pt-[12vh] backdrop-blur-[2px]"
+      // Auf dem Telefon weiter oben: Sobald die Tastatur aufgeht, bleibt von
+      // der Hoehe wenig uebrig, und 12 vh davon zu verschenken hiesse, die
+      // Treffer aus dem Bild zu schieben.
+      className="fixed inset-0 z-40 flex items-start justify-center bg-black/40 px-4 pt-[5vh] backdrop-blur-[2px] sm:pt-[12vh]"
       style={{ animation: 'overlay-in 140ms ease-out' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
@@ -145,7 +148,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             ref={listRef}
             id="palette-results"
             role="listbox"
-            className="max-h-[45vh] overflow-y-auto py-1.5"
+            // dvh statt vh: Auf Android schrumpft das Sichtfenster, wenn die
+            // Adressleiste einfaehrt - vh rechnet weiter mit der grossen Hoehe.
+            className="max-h-[45dvh] overflow-y-auto py-1.5"
           >
             {results.map((result, index) => (
               <li
