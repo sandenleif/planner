@@ -2752,7 +2752,7 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 
 [[package]]
 name = "planner"
-version = "1.0.5"
+version = "1.0.6"
 dependencies = [
  "log",
  "serde",
@@ -2763,6 +2763,8 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-log",
  "tauri-plugin-opener",
+ "tauri-plugin-planner-update",
+ "tauri-plugin-planner-widget",
  "tauri-plugin-positioner",
  "tauri-plugin-process",
  "tauri-plugin-single-instance",
@@ -3998,6 +4000,24 @@ dependencies = [
  "url",
  "windows",
  "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-planner-update"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-planner-widget"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]
