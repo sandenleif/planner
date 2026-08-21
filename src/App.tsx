@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router-dom'
-import { CheckCircle2, Search, Settings, WifiOff } from 'lucide-react'
+import { CheckCircle2, Search, Settings, WifiOff, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '@/auth/AuthProvider'
 import { SignInScreen } from '@/auth/SignInScreen'
@@ -71,6 +71,26 @@ function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const repo = useRepository()
+  const { pathname } = useLocation()
+
+  /*
+   * Das Menü schließt bei jedem Ansichtswechsel.
+   *
+   * Nicht nur beim Antippen eines Eintrags — dafür sorgt schon onNavigate.
+   * Der Fall, um den es hier geht, ist die Zurück-Geste: Sie führt die
+   * WebView eine Seite zurück (siehe unten), und ohne diese Zeile bliebe das
+   * ganzflächige Menü über einer Ansicht stehen, die man gar nicht mehr
+   * ausgewählt hat.
+   *
+   * Zur Zurück-Geste selbst: Sie funktioniert bereits. Tauri registriert auf
+   * Android einen Rückruf, der `webView.goBack()` aufruft, solange es einen
+   * Verlauf gibt, und die App sonst in den Hintergrund schickt. Weil die App
+   * HashRouter benutzt, legt jede Navigation einen Verlaufseintrag an — die
+   * Geste führt also dorthin zurück, wo man herkam.
+   */
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [pathname])
 
   // Strg/Cmd+K global. Auf window statt auf einem Container, damit das
   // Kuerzel auch greift, wenn der Fokus in einem Eingabefeld steht.
@@ -100,16 +120,30 @@ function Shell() {
   return (
     <div className="flex h-full">
       {/* Ab md dauerhaft sichtbar, darunter ein Overlay-Panel. */}
+      {/*
+        Ab md eine dauerhafte Seitenleiste, darunter eine GANZE Seite.
+
+        Vorher fuhr auf dem Telefon eine 240 Pixel breite Leiste von links
+        herein — ein Schreibtisch-Muster in klein. Auf einem 390 Pixel breiten
+        Schirm ist das kein Menue, sondern ein gequetschtes Fenster: Die
+        Listennamen brechen um, der Rest der App schimmert daneben durch, und
+        es ist nicht klar, ob man noch in der Liste ist oder schon woanders.
+
+        Ganzflaechig gibt es diese Frage nicht. Sie steigt von unten auf, wie
+        jede andere Ansicht auf einem Telefon auch, und geht ueber das X wieder
+        weg.
+      */}
       <aside
         className={clsx(
-          'z-30 flex w-60 shrink-0 flex-col border-r border-subtle bg-panel',
-          'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:transition-transform',
-          // Die Leiste ist auf dem Telefon `fixed` und misst sich damit am
-          // Sichtfenster, nicht am <body>. Dessen safe-area-Polster gilt fuer
-          // sie also nicht - ohne diese Zeile laege die Kopfzeile unter der
-          // Statusleiste und der Einstellungsknopf unter der Gestenleiste.
+          'z-30 flex shrink-0 flex-col bg-panel md:w-60 md:border-r md:border-subtle',
+          'max-md:fixed max-md:inset-0 max-md:w-full',
+          'max-md:transition-[opacity,transform] max-md:duration-200 max-md:ease-out',
+          // Fixed misst sich am Sichtfenster, nicht am <body> - dessen
+          // safe-area-Polster gilt hier also nicht.
           'max-md:pt-[env(safe-area-inset-top,0px)]',
-          menuOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full',
+          menuOpen
+            ? 'max-md:translate-y-0 max-md:opacity-100'
+            : 'max-md:pointer-events-none max-md:translate-y-3 max-md:opacity-0',
         )}
       >
         <div className="flex h-14 shrink-0 items-center gap-2 px-4" data-tauri-drag-region>
@@ -124,6 +158,16 @@ function Shell() {
               lokal
             </span>
           )}
+
+          {/* Ohne Hintergrund zum Danebentippen braucht es einen sichtbaren
+              Ausgang. Auf dem Desktop gibt es nichts zu schliessen. */}
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="btn-ghost -mr-2 ml-auto px-2 md:hidden"
+            aria-label="Schließen"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="px-3 pb-1">
@@ -157,13 +201,8 @@ function Shell() {
         </div>
       </aside>
 
-      {menuOpen && (
-        <button
-          className="fixed inset-0 z-20 bg-black/30 md:hidden"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Menü schließen"
-        />
-      )}
+      {/* Der abdunkelnde Hintergrund entfaellt: Es gibt nichts mehr, was
+          dahinter durchschiene. */}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Auf dem Desktop die Ziehflaeche fuer das Fenster, auf dem Telefon

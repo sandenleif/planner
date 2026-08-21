@@ -360,6 +360,80 @@
       transform: none;
       box-shadow: var(--shadow-tile);
     }
+
+    /* Stattdessen ein kurzes Eindruecken. Ohne irgendeine Rueckmeldung fuehlt
+       sich ein Tipp an, als waere er nicht angekommen - und das ist der
+       Moment, in dem eine App nach Webseite aussieht. */
+    .tile:active {
+      transform: scale(0.98);
+      box-shadow: var(--shadow-card);
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Was eine App von einer Webseite in einem Rahmen unterscheidet.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  /*
+   * Kein grauer Kasten beim Antippen.
+   *
+   * Android legt beim Beruehren eines Bedienelements eine graue Flaeche
+   * darueber - eine Erfindung aus der Zeit, als Webseiten sonst gar keine
+   * Rueckmeldung gaben. Auf einer runden Zeile bleibt davon ein eckiger
+   * Schatten stehen, und genau daran erkennt man eine Webseite.
+   */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='button'],
+  label {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+   * Kein Lupen- und Kopieren-Menue beim langen Druecken.
+   *
+   * In einer App haelt man den Finger auf eine Zeile, um etwas mit ihr zu
+   * tun - nicht, um ihren Text zu markieren. Felder sind ausgenommen: Dort
+   * ist das Markieren genau richtig.
+   */
+  body {
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable],
+  .selectable {
+    -webkit-touch-callout: default;
+  }
+
+  @media (pointer: coarse) {
+    /* Rollbalken sind eine Maus-Angelegenheit. Auf einem Telefon nimmt der
+       Daumen sie nicht in die Hand, aber sie nehmen Platz und malen einen
+       Streifen an den Rand. */
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    /*
+     * Rueckmeldung beim Tippen, weil es kein Ueberfahren gibt.
+     *
+     * Alle hover:-Regeln der App laufen auf Touch ins Leere - ein Knopf sieht
+     * beim Druecken also genauso aus wie davor. Ein kurzes Abdunkeln reicht;
+     * es muss nur ueberhaupt etwas passieren, und zwar sofort.
+     */
+    button:active,
+    a:active,
+    [role='button']:active {
+      opacity: 0.55;
+      transition-duration: 0ms;
+    }
   }
 }
 
