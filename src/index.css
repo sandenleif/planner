@@ -491,12 +491,18 @@
   height: 100%;
   border-radius: 14px;
   overflow: hidden;
-  /* Nicht ganz deckend: auf macOS liegt darunter das Popover-Material aus
-     tauri.conf.json, und die 8 % sind genau der Anteil, der es durchscheinen
-     laesst. Faellt das Material aus - andere Plattform, kein Compositor -,
-     bleibt eine praktisch deckende Flaeche stehen. Der Panel sieht dann
-     schlichter aus, aber nie kaputt. */
-  background-color: color-mix(in oklab, var(--surface-app) 92%, transparent);
+  /*
+   * Deckend. Auf Windows und Linux liegt hinter dem Fenster nichts als der
+   * Schreibtisch - jede Durchsichtigkeit zeigt dort einfach Symbole und
+   * Hintergrundbild durch das Panel.
+   *
+   * Vorher standen hier 92 %, mit dem Gedanken, das macOS-Material
+   * durchscheinen zu lassen. Das war der richtige Gedanke am falschen Ort:
+   * Auf macOS macht das inzwischen `.is-macos .panel-surface` weiter unten,
+   * und zwar viel deutlicher. Die 8 % blieben nur als Fehler auf allen
+   * anderen Plattformen uebrig.
+   */
+  background-color: var(--surface-app);
   /* Die Haarlinie gibt der Flaeche eine Kante, wo der Schreibtisch dahinter
      zufaellig aehnlich hell ist. */
   box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.14),
@@ -504,13 +510,10 @@
   transform-origin: top center;
 }
 
-@supports (backdrop-filter: blur(1px)) {
-  .panel-surface {
-    /* Fuer alles ausser macOS: dort ist es schon das Fenstermaterial. Doppelt
-       schadet nicht, der Filter greift nur auf das, was durchscheint. */
-    backdrop-filter: blur(20px) saturate(180%);
-  }
-}
+/* Der backdrop-filter stand hier eine Weile "fuer alles ausser macOS". Er tat
+   nie etwas: Weichgezeichnet wird nur, was IM DOKUMENT dahinterliegt, und in
+   einem durchsichtigen Fenster liegt dort nichts. Jetzt, wo die Flaeche
+   deckend ist, gaebe es ohnehin nichts mehr durchzuzeichnen. */
 
 .dark .panel-surface {
   box-shadow: inset 0 0 0 1px oklch(1 0 0 / 0.07),

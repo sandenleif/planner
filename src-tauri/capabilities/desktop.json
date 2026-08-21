@@ -1,8 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop",
-  "description": "Updater und Neustart nach dem Einspielen. Musste aus default.json heraus: die beiden Plugins sind in Cargo.toml auf Desktop beschraenkt, und eine Berechtigung fuer ein Plugin, das es auf Android gar nicht gibt, laesst den Android-Build mit 'permission not found' abbrechen - noch bevor eine Zeile Kotlin uebersetzt wird.",
+  "description": "Updater, Neustart nach dem Einspielen und das Ziehen von Fenstern. Musste aus default.json heraus: die beiden Plugins sind in Cargo.toml auf Desktop beschraenkt, und eine Berechtigung fuer ein Plugin, das es auf Android gar nicht gibt, laesst den Android-Build mit 'permission not found' abbrechen - noch bevor eine Zeile Kotlin uebersetzt wird. allow-start-dragging steht NICHT in core:window:default (nachgezaehlt in den Berechtigungen der tauri-Kiste) - ohne diese Zeile ruft data-tauri-drag-region einen Befehl auf, den es nicht darf, und kein Fenster laesst sich am Kopf ziehen.",
   "platforms": ["macOS", "windows", "linux"],
   "windows": ["main", "panel"],
-  "permissions": ["updater:default", "process:allow-restart"]
+  "permissions": [
+    "updater:default",
+    "process:allow-restart",
+    "core:window:allow-start-dragging"
+  ]
 }
