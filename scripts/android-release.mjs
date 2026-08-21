@@ -109,8 +109,17 @@ function configureSigning() {
  * braucht das Skript keine Stelle im erzeugten Code zu treffen, und ein
  * geänderter Tauri-Generator kann es nicht kaputt machen.
  *
- * Die Java-Klassen stehen voll qualifiziert da, damit oben keine import-Zeile
- * eingefügt werden muss — die dürfte in Kotlin nicht am Dateiende stehen.
+ * Kein einziges `java.` im angehängten Block, und das ist der Knackpunkt: In
+ * einem Gradle-Kotlin-Skript ist der Name `java` bereits vergeben — das
+ * Java-Plugin hängt unter diesem Namen eine Erweiterung an das Projekt. Der
+ * Ausdruck `java.util.Properties()` wird deshalb als „Eigenschaft java, davon
+ * .util" gelesen und scheitert mit „Unresolved reference: util".
+ *
+ * Der übliche Ausweg wäre ein `import java.util.Properties` am Dateianfang.
+ * Den gibt es hier nicht: Dieser Block wird ANGEHÄNGT, und Kotlin-Importe
+ * dürfen nicht am Dateiende stehen. Also wird die Datei mit Bordmitteln der
+ * Kotlin-Standardbibliothek zerlegt — `readLines` und `associate` brauchen
+ * keinen Import und stolpern über keinen belegten Namen.
  */
 function appendSigningBlock() {
   const existing = readFileSync(GRADLE_FILE, 'utf8')
@@ -124,20 +133,39 @@ function appendSigningBlock() {
     `
 
 // --- PLANNER_SIGNING (scripts/android-release.mjs) ---
-val plannerKeystoreProperties = java.util.Properties().apply {
-    val file = rootProject.file("keystore.properties")
-    if (file.exists()) {
-        java.io.FileInputStream(file).use { load(it) }
+//
+// Ohne java.util.Properties, und das ist Absicht: In einem Gradle-Skript ist
+// der Name "java" schon belegt (die Erweiterung des Java-Plugins). Aus
+// java.util.Properties() wird dort "Eigenschaft java, davon .util" - und der
+// Build bricht mit "Unresolved reference: util" ab, noch bevor eine Zeile
+// Kotlin der App uebersetzt wird.
+val plannerKeystore: Map<String, String> = rootProject.file("keystore.properties").let { file ->
+    if (!file.exists()) {
+        emptyMap()
+    } else {
+        file.readLines()
+            .filter { it.contains("=") && !it.trimStart().startsWith("#") }
+            .associate { line ->
+                val separator = line.indexOf('=')
+                line.substring(0, separator).trim() to line.substring(separator + 1).trim()
+            }
     }
 }
 
 android {
     signingConfigs {
         create("planner") {
-            storeFile = rootProject.file(plannerKeystoreProperties["storeFile"] as String)
-            storePassword = plannerKeystoreProperties["storePassword"] as String
-            keyAlias = plannerKeystoreProperties["keyAlias"] as String
-            keyPassword = plannerKeystoreProperties["keyPassword"] as String
+            // Lieber hier laut scheitern als still mit dem Debug-Schluessel
+            // weiterbauen: Ein Release mit falscher Signatur faellt erst auf,
+            // wenn ein Geraet das Update ablehnt.
+            storeFile = rootProject.file(
+                plannerKeystore["storeFile"] ?: error("keystore.properties: storeFile fehlt"),
+            )
+            storePassword = plannerKeystore["storePassword"]
+                ?: error("keystore.properties: storePassword fehlt")
+            keyAlias = plannerKeystore["keyAlias"] ?: error("keystore.properties: keyAlias fehlt")
+            keyPassword = plannerKeystore["keyPassword"]
+                ?: error("keystore.properties: keyPassword fehlt")
             // Von openssl erzeugte Keystores sind PKCS12. Ohne diese Zeile
             // raet Gradle anhand der Dateiendung und faellt bei .p12 auf JKS
             // zurueck - mit einer Fehlermeldung, die nach kaputtem Passwort
