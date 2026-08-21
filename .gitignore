@@ -39,3 +39,6 @@ Thumbs.db
 # Tauri-Signaturschluessel: privat, gehoert NIE ins Repo.
 # Der oeffentliche Teil steht in src-tauri/tauri.conf.json.
 .tauri/
+
+# Umbenannte Android-Pakete fuer das Release (scripts/android-publish.mjs).
+dist-android/

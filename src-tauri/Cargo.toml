@@ -56,3 +56,8 @@ tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 # ist es, der die Releases baut.
 [target.'cfg(target_os = "android")'.dependencies]
 tauri-plugin-planner-widget = { path = "plugins/planner-widget" }
+# Aktualisierung der App aus der App heraus. Das Gegenstueck zu
+# tauri-plugin-updater weiter oben, der ausdruecklich NICHT fuer Android
+# gebaut wird: dort ersetzt der PackageInstaller das Paket, statt Dateien
+# auszutauschen. Die Begruendung steht ausfuehrlich in plugins/planner-update.
+tauri-plugin-planner-update = { path = "plugins/planner-update" }

@@ -1,0 +1,18 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = """
+Erlaubt der App, nach einer neueren Fassung zu sehen und sie einzuspielen.
+
+Die WebView kann dabei keine beliebige Datei laden: die Adresse des Manifests
+ist im Kotlin-Teil festgelegt, und die APK-Adresse wird dort gegen ein festes
+Praefix geprueft. Ein Fehler im Frontend kann darueber also kein fremdes Paket
+installieren lassen.
+"""
+permissions = [
+  "allow-fetch-manifest",
+  "allow-can-install",
+  "allow-open-install-settings",
+  "allow-start-update",
+  "allow-update-state",
+]

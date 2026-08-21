@@ -1,0 +1,5 @@
+// Siehe plugins/planner-widget/android/settings.gradle - nur fuer den Fall,
+// dass dieser Ordner einmal fuer sich geoeffnet wird. Im APK-Build bindet
+// src-tauri/gen/android/tauri.settings.gradle das Modul ein.
+include ':tauri-android'
+project(':tauri-android').projectDir = new File('./.tauri/tauri-api')

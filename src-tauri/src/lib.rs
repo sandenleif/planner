@@ -499,6 +499,13 @@ pub fn run() {
     #[cfg(target_os = "android")]
     let builder = builder.plugin(tauri_plugin_planner_widget::init());
 
+    // Ebenfalls nur Android: der Weg zu einer neueren Fassung. Auf dem Desktop
+    // macht das tauri_plugin_updater weiter oben - der laesst sich hier nicht
+    // verwenden, weil eine Android-App ihr eigenes Verzeichnis nicht
+    // beschreiben darf und nur der PackageInstaller sie ersetzen kann.
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_planner_update::init());
+
     builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())

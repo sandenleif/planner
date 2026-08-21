@@ -26,6 +26,18 @@ export const isDesktop = isTauri && (osName === 'windows' || osName === 'macos' 
 export const isAndroid = osName === 'android'
 export const isWeb = !isTauri
 
+/**
+ * Die Android-APP - nicht der Android-Browser.
+ *
+ * `isAndroid` allein ist auch in Chrome auf einem Telefon wahr; es beschreibt
+ * das Betriebssystem, nicht die Umgebung. Wer einen nativen Befehl aufruft,
+ * braucht diese Unterscheidung: Im Browser gibt es das Plugin dahinter nicht,
+ * und der Aufruf endet in einem Fehler statt in einer Funktion, die es dort
+ * einfach nicht gibt. Gegenstueck zu `isDesktop`, das `isTauri` ebenso
+ * einschliesst.
+ */
+export const isAndroidApp = isTauri && isAndroid
+
 /** Touch-Bedienung: groessere Trefferflaechen, keine Hover-Affordanzen. */
 export const isTouchPrimary =
   typeof window !== 'undefined' &&

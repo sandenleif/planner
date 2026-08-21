@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wird beim Bauen in das Manifest der App hineingemischt (Manifest Merger).
+  Vollstaendige Klassennamen, keine Kurzform mit fuehrendem Punkt: die loeste
+  der Merger gegen das Paket der APP auf, nicht gegen das dieser Bibliothek.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Ohne diese Berechtigung wirft der PackageInstaller beim commit() eine
+      SecurityException. Sie allein genuegt aber nicht: ab Android 8 muss der
+      Nutzer der App zusaetzlich "Unbekannte Apps installieren" erlauben.
+      Genau das fragt canInstall() ab, bevor ueberhaupt geladen wird - sonst
+      liefe ein 40-MB-Download in eine Sackgasse.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+
+        <!--
+          Nimmt die Rueckmeldungen des PackageInstaller entgegen. Im Manifest
+          und nicht ueber registerReceiver(): der wichtigste Fall ist
+          STATUS_SUCCESS, und der trifft ein, waehrend der eigene Prozess
+          gerade ersetzt und beendet wird. Ein dynamisch registrierter
+          Empfaenger waere dann laengst mit abgeraeumt.
+
+          exported="false" ist richtig: zugestellt wird ueber einen
+          PendingIntent, den diese App selbst erzeugt hat. Fremde Apps haetten
+          hier nichts zu suchen.
+        -->
+        <receiver
+            android:name="de.leifsanden.planner.update.InstallResultReceiver"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

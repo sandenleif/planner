@@ -20,6 +20,15 @@ export interface Toast {
 interface ToastState {
   toasts: Toast[]
   push(toast: Omit<Toast, 'id' | 'duration'> & { duration?: number }): string
+  /**
+   * Tauscht den Text einer stehenden Meldung aus.
+   *
+   * Fuer Vorgaenge, die eine Weile dauern und dabei erzaehlen, wie weit sie
+   * sind - der Ladebalken beim Android-Update. Neu zu pushen und die alte zu
+   * verwerfen sieht anders aus: Die Meldung faehrt jedes Mal heraus und
+   * wieder herein, und ihre Anzeigedauer beginnt von vorn.
+   */
+  update(id: string, message: string): void
   dismiss(id: string): void
 }
 
@@ -33,6 +42,12 @@ export const useToastStore = create<ToastState>()((set) => ({
 
     set((state) => ({ toasts: [...state.toasts, { ...toast, id, duration }] }))
     return id
+  },
+
+  update(id, message) {
+    set((state) => ({
+      toasts: state.toasts.map((t) => (t.id === id ? { ...t, message } : t)),
+    }))
   },
 
   dismiss(id) {
@@ -50,5 +65,11 @@ export const toast = {
   },
   error(message: string) {
     return useToastStore.getState().push({ message, duration: 6000 })
+  },
+  update(id: string, message: string) {
+    useToastStore.getState().update(id, message)
+  },
+  dismiss(id: string) {
+    useToastStore.getState().dismiss(id)
   },
 }

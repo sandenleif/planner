@@ -17,7 +17,8 @@
     "android:init": "tauri android init",
     "android:dev": "tauri android dev",
     "android:build": "tauri android build",
-    "android:release-setup": "node scripts/android-release.mjs"
+    "android:release-setup": "node scripts/android-release.mjs",
+    "android:publish": "node scripts/android-publish.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

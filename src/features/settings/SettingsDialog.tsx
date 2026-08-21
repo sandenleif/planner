@@ -6,7 +6,7 @@ import { useAuth } from '@/auth/AuthProvider'
 import { useRepository } from '@/data/RepositoryProvider'
 import type { PlannerBackup } from '@/data/types'
 import { useTheme, type Theme } from '@/app/theme'
-import { isDesktop, isTauri, osName, type OsName } from '@/lib/platform'
+import { isAndroidApp, isDesktop, isTauri, osName, type OsName } from '@/lib/platform'
 import { appVersion, checkForUpdatesNow, type UpdateCheck } from '@/lib/updater'
 import { Dialog } from '@/ui/Dialog'
 
@@ -159,7 +159,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
 
       {/* Nur montiert, solange der Dialog offen ist: so beginnt jedes Öffnen
           ohne das Suchergebnis von vorhin, das inzwischen überholt sein kann. */}
-      {isDesktop && open && <UpdateSection onClose={onClose} />}
+      {(isDesktop || isAndroidApp) && open && <UpdateSection onClose={onClose} />}
 
       {status && <p className="mt-4 text-sm text-accent-600">{status}</p>}
     </Dialog>
@@ -169,8 +169,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
 /**
  * Version und Update-Suche.
  *
- * Nur auf dem Desktop — im Browser ist Neuladen die Aktualisierung, auf Android
- * macht das der Store.
+ * Nicht im Browser — dort ist Neuladen die Aktualisierung.
  *
  * Die Antwort steht im Dialog und nicht im Toaster: der Dialog liegt über
  * `showModal()` in der Top-Layer, eine Kurzmeldung am unteren Rand läge
@@ -245,6 +244,14 @@ function UpdateSection({ onClose }: { onClose: () => void }) {
         Aktualisierungen kommen von GitHub Releases. Vor dem Einspielen wird die
         Signatur geprüft — ein Paket, das nicht mit dem passenden Schlüssel
         signiert ist, wird abgelehnt.
+        {isAndroidApp && (
+          <>
+            {' '}
+            Android fragt dabei einmal nach. Es ist ein Update, keine
+            Neuinstallation: Aufgaben, Einstellungen und die Anmeldung bleiben
+            erhalten.
+          </>
+        )}
       </p>
     </section>
   )

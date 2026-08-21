@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/android-schema.json",
   "identifier": "android",
-  "description": "Erlaubt der App, den Stand des Homescreen-Widgets zu setzen.",
+  "description": "Homescreen-Widget und die Aktualisierung der App. Beides gibt es nur hier: Der Updater aus desktop.json ist auf Desktop beschraenkt, weil eine Android-App nur ueber den PackageInstaller ersetzt werden kann.",
   "platforms": ["android"],
   "windows": ["main"],
-  "permissions": ["planner-widget:default"]
+  "permissions": ["planner-widget:default", "planner-update:default"]
 }
