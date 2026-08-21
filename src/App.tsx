@@ -153,7 +153,15 @@ function Shell() {
       */}
       <aside
         className={clsx(
-          'z-30 flex shrink-0 flex-col bg-panel md:w-60 md:border-r md:border-subtle',
+          // Auf dem Telefon ist es eine ganze Ansicht und traegt deshalb den
+          // Grund der App. Auf dem Schreibtisch ist es eine Seitenleiste und
+          // muss sich vom Inhalt daneben abheben - dafuer GRAUER, nicht
+          // heller. Weiss (1.0) neben einem Inhaltsbereich von 0.963 waere ein
+          // Unterschied von 0.037, den man auf einem hellen Bildschirm nicht
+          // als Kante liest: Die Leiste verschwindet in der Seite. Gestuft ist
+          // es Leiste (0.933) - Grund (0.963) - Karte (1.0), also drei klar
+          // getrennte Ebenen.
+          'z-30 flex shrink-0 flex-col max-md:bg-app md:w-60 md:border-r md:border-subtle md:bg-sunken',
           'max-md:fixed max-md:inset-0 max-md:w-full',
           'max-md:transition-[opacity,transform] max-md:duration-200 max-md:ease-out',
           // Fixed misst sich am Sichtfenster, nicht am <body> - dessen
