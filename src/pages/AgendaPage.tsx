@@ -137,10 +137,12 @@ function Section({
       >
         {title}
       </h2>
-      {/* Ohne Karte: Die Zeilen liegen auf dem Grund der Seite. Das negative
-          Randmaß hebt die Polsterung von FlatTaskRow auf, damit die Titel
-          bündig unter der Überschrift stehen. */}
-      <div className="-mx-3.5 divide-y divide-ink/8">{children}</div>
+      {/* Telefon: randlos auf dem Grund, das negative Randmaß hebt die
+          Polsterung von FlatTaskRow auf. Schreibtisch: in einer Karte, sonst
+          steht die Spalte ohne Halt in einem breiten Fenster. */}
+      <div className="-mx-3.5 divide-y divide-ink/8 md:mx-0 md:card md:divide-subtle md:overflow-hidden">
+        {children}
+      </div>
     </section>
   )
 }

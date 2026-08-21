@@ -78,11 +78,25 @@
    * Weg haelt. Die Karten darauf sind reines Weiss - dieser Abstand traegt
    * die Flaechen.
    */
-  --surface-app: oklch(0.975 0.004 260);
+  /*
+   * Der Abstand zwischen Grund und Karte ist das, was eine Karte ueberhaupt
+   * sichtbar macht.
+   *
+   * Erster Anlauf: Grund 0.975, Karte 1.0 - ein Abstand von 0.025. Das alte
+   * Creme hatte 0.044. Zusammen mit den Karten, die ich aus den Aufgaben-
+   * listen entfernt hatte, ergab das auf einem grossen Bildschirm eine flache
+   * weisse Flaeche ohne jede Gliederung. Auf einem Telefon faellt das nicht
+   * auf, weil dort ohnehin eine Ansicht den ganzen Schirm fuellt.
+   *
+   * Jetzt 0.037 - naeher am alten Wert, ohne die Kuehle aufzugeben. Und die
+   * Haarlinie ist etwas kraeftiger: Sie ist die zweite Sache, die eine Kante
+   * beschreibt.
+   */
+  --surface-app: oklch(0.963 0.005 260);
   --surface-panel: oklch(1 0 0);
-  --surface-sunken: oklch(0.951 0.006 260);
-  --surface-hover: oklch(0.937 0.008 260);
-  --border-subtle: oklch(0.915 0.008 260);
+  --surface-sunken: oklch(0.933 0.007 260);
+  --surface-hover: oklch(0.916 0.009 260);
+  --border-subtle: oklch(0.888 0.01 260);
   --text-primary: oklch(0.22 0.014 260);
   --text-muted: oklch(0.52 0.026 258);
   --shadow-card: 0 1px 2px oklch(0.22 0.014 260 / 0.06),
@@ -193,6 +207,29 @@
   }
 }
 
+/*
+ * Karte: die Flaeche, auf der Inhalt liegt.
+ *
+ * Als @utility angemeldet und nicht als Klasse in @layer components, und der
+ * Unterschied ist keine Formsache: Varianten wie `md:` erzeugt Tailwind nur
+ * fuer Utilities. Was in @layer components steht, ist fuer Tailwind normales
+ * CSS - `md:card` waere dort eine Klasse, zu der nie eine Regel entsteht.
+ *
+ * Gebraucht wird die Variante, weil die Karte geraeteabhaengig ist: Auf einem
+ * Telefon fuellt eine Ansicht den ganzen Schirm, eine Karte darin grenzt
+ * nichts ab. In einem breiten Fenster steht die Spalte ohne sie haltlos in
+ * der Flaeche.
+ *
+ * Gegenprobe im gebauten CSS: `.md\:card` steht in
+ * `@media (min-width:48rem)`.
+ */
+@utility card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-panel);
+  box-shadow: var(--shadow-card);
+}
+
 @layer components {
   /* Die Basis steht als gemeinsame Selektorliste, nicht als `@apply btn` in
      den Varianten: Tailwind 4 laesst @apply nur noch auf echte Utilities zu,
@@ -264,10 +301,7 @@
            focus:outline-none;
   }
 
-  .card {
-    @apply rounded-[var(--radius-card)] border border-subtle bg-panel;
-    box-shadow: var(--shadow-card);
-  }
+  /* .card steht als @utility weiter unten - siehe die Begruendung dort. */
 
   /*
    * Schwebende Flaeche fuer Dialoge.

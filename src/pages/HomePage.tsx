@@ -141,7 +141,7 @@ export function HomePage() {
           <h2 className="px-1 pb-1 text-label font-bold uppercase tracking-[0.1em] text-muted">
             Als Nächstes
           </h2>
-          <div className="-mx-3.5 divide-y divide-ink/8">
+          <div className="-mx-3.5 divide-y divide-ink/8 md:mx-0 md:card md:divide-subtle md:overflow-hidden">
             {dueToday.slice(0, MAX_TODAY_PREVIEW).map((task) => (
               <FlatTaskRow key={task.id} task={task} list={listById.get(task.listId)} />
             ))}

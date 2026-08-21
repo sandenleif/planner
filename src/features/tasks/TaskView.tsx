@@ -257,12 +257,21 @@ export function TaskView({ listId, accent }: { listId: string; accent: string })
         </div>
       )}
 
-      {/* Ohne Karte darum. Eine Karte grenzt ab — hier gibt es aber nichts
-          abzugrenzen: Die Aufgaben SIND die Seite. Getrennt wird durch eine
-          Haarlinie, die man sieht, wenn man hinsieht, und nicht, wenn man
-          liest. */}
+      {/*
+        Auf dem Telefon randlos, auf dem Schreibtisch in einer Karte.
+
+        Das ist keine Unentschlossenheit, sondern der Unterschied zwischen den
+        Geräten. Auf einem Telefon füllt eine Ansicht den ganzen Schirm — eine
+        Karte darin grenzt nichts ab, sie fügt nur einen Rahmen hinzu, den man
+        nicht braucht. Auf einem breiten Fenster steht die Spalte dagegen
+        mitten in einer leeren Fläche, und ohne Karte weiß das Auge nicht, wo
+        der Inhalt anfängt.
+
+        Genau diese Unterscheidung hatte ich zuerst vergessen: Ich hatte die
+        Karte überall entfernt, weil sie auf dem Telefon störte.
+      */}
       {rows.length > 0 && (
-        <div className="divide-y divide-ink/8">
+        <div className="divide-y divide-ink/8 md:card md:divide-subtle md:px-3 md:py-1">
           {rows.map((node) => (
             <Fragment key={node.id}>
               <TaskRow
