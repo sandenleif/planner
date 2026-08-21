@@ -106,14 +106,23 @@ export function FlatTaskRow({
               aria-label={`Priorität ${PRIORITY_LABEL[task.priority]}`}
             />
           ) : null}
-          <span
+          {/*
+            Der Titel führt in seine Liste.
+
+            Hier lässt sich nichts bearbeiten — das ist Absicht, in „Heute"
+            geht es ums Abarbeiten. Ohne diesen Weg war die Zeile aber eine
+            Sackgasse: Man sah eine Aufgabe, wollte sie umbenennen oder
+            einrücken und hatte auf dem Telefon keinen Weg dorthin.
+          */}
+          <Link
+            to={`/list/${task.listId}`}
             className={clsx(
               'min-w-0 flex-1 truncate text-task leading-snug',
               task.done && 'text-muted line-through decoration-muted/55',
             )}
           >
             {task.title}
-          </span>
+          </Link>
         </div>
 
         {meta.length > 0 && (

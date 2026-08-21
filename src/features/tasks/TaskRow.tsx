@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CornerDownRight,
   Flag,
+  MoreHorizontal,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
@@ -234,50 +235,45 @@ export function TaskRow({
       </button>
 
       <div className="min-w-0 flex-1">
-        {isTouchPrimary ? (
-          <button
-            onClick={() => actions.onOpenActions(node)}
+        {/*
+          Der Titel ist IMMER ein Eingabefeld, auch auf dem Telefon.
+
+          Eine Zeit lang war er dort ein Knopf, der das Aktionsblatt öffnete —
+          und damit gab es keinen Weg mehr, eine Aufgabe umzubenennen. Schlimmer
+          noch: „Unterpunkt hinzufügen" legt eine Aufgabe mit leerem Titel an,
+          die auf den Fokus dieses Feldes wartet. Ohne Feld entstand eine Zeile,
+          die sich nie benennen ließ.
+
+          Ein Tipp setzt jetzt den Cursor hinein und die Tastatur fährt auf —
+          derselbe Handgriff wie in jeder Notiz-App. Enter legt gleich die
+          nächste Aufgabe an, deshalb enterKeyHint="next": Die Tastatur zeigt
+          dann einen Weiter-Pfeil statt eines Häkchens.
+        */}
+        <div className="flex items-baseline">
+          {node.priority ? (
+            <span
+              className={clsx(
+                'mr-2 size-1.5 shrink-0 translate-y-[-2px] rounded-full',
+                PRIORITY_DOT[node.priority],
+              )}
+              aria-label={`Priorität ${PRIORITY_LABEL[node.priority]}`}
+            />
+          ) : null}
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={onKeyDown}
+            enterKeyHint="next"
+            placeholder="Aufgabe"
             className={clsx(
-              'flex w-full items-baseline gap-0 text-left text-task leading-snug',
+              'min-w-0 flex-1 bg-transparent py-0 text-task leading-snug outline-none placeholder:text-muted/70',
               node.done && 'text-muted line-through decoration-muted/55',
             )}
-          >
-            {node.priority ? (
-              <span
-                className={clsx(
-                  'mr-2 size-1.5 shrink-0 translate-y-[-2px] rounded-full',
-                  PRIORITY_DOT[node.priority],
-                )}
-                aria-label={`Priorität ${PRIORITY_LABEL[node.priority]}`}
-              />
-            ) : null}
-            <span className="min-w-0">{node.title || 'Ohne Titel'}</span>
-          </button>
-        ) : (
-          <div className="flex items-baseline">
-            {node.priority ? (
-              <span
-                className={clsx(
-                  'mr-2 size-1.5 shrink-0 translate-y-[-2px] rounded-full',
-                  PRIORITY_DOT[node.priority],
-                )}
-                aria-label={`Priorität ${PRIORITY_LABEL[node.priority]}`}
-              />
-            ) : null}
-            <input
-              ref={inputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commit}
-              onKeyDown={onKeyDown}
-              className={clsx(
-                'min-w-0 flex-1 bg-transparent py-0 text-task leading-snug outline-none',
-                node.done && 'text-muted line-through decoration-muted/55',
-              )}
-              aria-label="Aufgabentitel"
-            />
-          </div>
-        )}
+            aria-label="Aufgabentitel"
+          />
+        </div>
 
         {meta.length > 0 && (
           <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-meta text-muted">
@@ -292,10 +288,24 @@ export function TaskRow({
       </div>
 
       {/*
-        Nur mit Zeiger. Auf Touch führt derselbe Weg über das Aktionsblatt —
-        die Symbolreihe stand dort dauerhaft im Bild, weil es kein Überfahren
-        gibt, und war mit 26 Pixeln zu klein zum sicheren Treffen.
+        Auf Touch genau EIN Knopf, und der öffnet das Aktionsblatt.
+
+        Fünf Symbole nebeneinander waren zu viel: Sie standen dauerhaft im Bild
+        (es gibt kein Überfahren), drückten den Titel in die Enge und waren mit
+        26 Pixeln zu klein zum Treffen. Einer ist etwas anderes — er nimmt kaum
+        Platz, ist mit tap-target sicher zu treffen, und ohne ihn gäbe es auf
+        dem Telefon keinen Weg zu Einrücken, Verschieben und Löschen.
       */}
+      {isTouchPrimary && (
+        <button
+          onClick={() => actions.onOpenActions(node)}
+          className="tap-target mt-px shrink-0 rounded-lg p-1.5 text-muted transition-colors active:bg-sunken"
+          aria-label={`Aktionen für „${node.title || 'Aufgabe ohne Titel'}“`}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+      )}
+
       {!isTouchPrimary && (
         <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           {!node.dueAt && (

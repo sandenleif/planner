@@ -8,10 +8,15 @@
       Gestenleiste. Kein user-scalable=no - das wuerde auch Pinch-Zoom
       abschalten. Gegen den Zoom beim Doppeltippen hilft touch-action:
       manipulation auf den Bedienelementen (siehe index.css).
+
+      interactive-widget=resizes-content: Wenn die Tastatur aufgeht, soll die
+      Seite kuerzer werden, statt dass die Tastatur sich darueberlegt. Ohne
+      das bliebe die Schnellerfassung, die am unteren Rand klebt, hinter der
+      Tastatur liegen - also genau das Feld, in das man gerade tippen wollte.
     -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="description" content="Aufgaben und geteilte Listen" />
     <meta name="color-scheme" content="light dark" />
